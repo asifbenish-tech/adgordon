@@ -1,6 +1,6 @@
 // הגדרות. שום דבר כאן אינו סוד (הריפו ציבורי).
 // AUTH_API ריק = אין כניסה אמיתית; האפליקציה נפתחת רק במצב הדגמה.
-export const AUTH_API = "";   // כתובת ה-Web App של server/Code.gs (מסתיימת ב-/exec)
+export const AUTH_API = "https://script.google.com/macros/s/AKfycbybc8g3EQJ0Ki6YLg7WWwhsUGi_KlIEWcciPugCN0voO1S1INHxTZDHQ5oiPy64gLe0/exec";   // כתובת ה-Web App של server/Code.gs (מסתיימת ב-/exec)
 export const SDK = "https://www.gstatic.com/firebasejs/12.19.0/";
 export const FIREBASE = {
   apiKey: "AIzaSyAXThb9nGkGSKH8ulaznf0ABgzJmlRxYEo",
