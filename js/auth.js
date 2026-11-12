@@ -6,6 +6,8 @@ import {startData, loadTT} from "./data.js";
 import {$, esc, ls, uidOf, nameOf, heSort} from "./util.js";
 
 let A, auth, fbApp, step = {s: "id"};
+// סמל בית החינוך (logo.png בשורש הריפו). אם הקובץ חסר - אייקון במקומו.
+const LOGO = '<div class="biglogo"><img src="logo.png" alt="סמל בית חינוך א.ד. גורדון" onerror="this.parentNode.className=\'bigico\';this.outerHTML=\'<i class=&quot;fa-solid fa-user-lock&quot;></i>\'"></div>';
 
 export async function initAuth() {
   loadTT();
@@ -36,12 +38,12 @@ export function signOut() {
 }
 
 export function loginHtml() {
-  if (DEMO) return '<div class="card form"><div class="bigico"><i class="fa-solid fa-flask"></i></div><h2>מצב הדגמה</h2>' +
+  if (DEMO) return '<div class="card form">' + LOGO + '<h2>מצב הדגמה</h2>' +
     "<p>כך האפליקציה תיראה. הנתונים הם דוגמה ונשמרים רק במכשיר הזה. הכניסה האמיתית תהיה עם תעודת זהות וקוד שמגיע למייל.</p>" +
     '<button type="button" class="btn" data-demo="teacher">כניסה כאיש/אשת צוות</button><button type="button" class="btn ghost" data-demo="admin">כניסה כהנהלה</button></div>';
   const err = step.err ? '<div class="err" role="alert">' + esc(step.err) + "</div>" : step.note ? '<div class="ok" role="status">' + esc(step.note) + "</div>" : "";
   if (step.s === "id") return '<form class="card form" id="lform" novalidate>' +
-    '<div class="bigico"><i class="fa-solid fa-user-lock"></i></div><h2>כניסה</h2>' +
+    LOGO + "<h2>כניסה</h2>" +
     "<p>נכנסים פעם אחת בכל מכשיר. אחרי הכניסה האפליקציה זוכרת אותך.</p>" +
     '<label class="field code"><span>תעודת זהות</span><input id="lin" inputmode="numeric" autocomplete="off" maxlength="9" required value="' + esc(step.id || "") + '"></label>' +
     err + '<button class="btn"' + (step.busy ? " disabled" : "") + ">" + (step.busy ? "שולח…" : "שליחת קוד למייל") + "</button>" +
@@ -57,7 +59,7 @@ export function loginHtml() {
 export function bindLogin() {
   if (DEMO) {
     for (const b of document.querySelectorAll("[data-demo]")) b.onclick = async () => {
-      const names = S.T ? Object.keys(S.T.teachers).sort(heSort) : [], name = names[0] || "אנה";
+      const names = S.T ? Object.keys(S.T.teachers).sort(heSort) : [], want = b.dataset.demo === "admin" ? "אסיף" : "גלית", name = names.includes(want) ? want : names[0] || "אנה";
       S.user = {uid: uidOf(name), name, role: b.dataset.demo, house: ""};
       ls("adgDemoUser", S.user); await enter(); changed();
     };

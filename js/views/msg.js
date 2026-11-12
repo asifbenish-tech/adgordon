@@ -24,7 +24,7 @@ function chatsHtml() {
   if (S.chats == null) return loading;
   return '<a class="btn ghost" href="#/new"><i class="fa-solid fa-pen-to-square"></i> שיחה חדשה</a>' +
     (S.chats.length ? '<div class="list">' + S.chats.map(c => { const o = person(otherOf(c)), l = c.last || {};
-      return '<a class="item chatrow' + (chatUnread(c) ? " new" : "") + '" href="#/chat/' + encodeURIComponent(o.uid) + '">' + avatar(o.name) + "<div><b>" + esc(o.full) + "</b><span>" +
+      return '<a class="item chatrow' + (chatUnread(c) ? " new" : "") + '" href="#/chat/' + encodeURIComponent(o.uid) + '">' + avatar(o) + "<div><b>" + esc(o.full) + "</b><span>" +
         (l.by === S.user.uid ? "את/ה: " : "") + esc(l.text || "") + "</span></div><small>" + (l.at ? esc(ago(l.at)) : "") + "</small></a>"; }).join("") + "</div>"
       : empty("אין שיחות עדיין", "אפשר לפתוח שיחה פרטית עם כל איש צוות."));
 }
@@ -59,7 +59,7 @@ export const msg = {
 // ---- בחירת איש צוות לשיחה חדשה ----
 const pickList = () => {
   const s = q.trim(), list = people().filter(p => p.uid !== S.user.uid && !p.off && (!flt || p.groups.includes(flt)) && (!s || p.full.includes(s) || p.name.includes(s)));
-  return list.length ? list.map(p => '<a class="item" href="#/chat/' + encodeURIComponent(p.uid) + '">' + avatar(p.name) + "<div><b>" + esc(p.full) + '</b><div class="tags">' + tags(p.groups) + "</div></div></a>").join("") : empty("לא נמצאו אנשי צוות");
+  return list.length ? list.map(p => '<a class="item" href="#/chat/' + encodeURIComponent(p.uid) + '">' + avatar(p) + "<div><b>" + esc(p.full) + '</b><div class="tags">' + tags(p.groups) + "</div></div></a>").join("") : empty("לא נמצאו אנשי צוות");
 };
 export const pick = {
   parent: "msg", tab: "msg",

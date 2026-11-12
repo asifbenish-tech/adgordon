@@ -3,7 +3,7 @@
 import {S, changed} from "./state.js";
 import {watch, put, del} from "./store.js";
 import {DEFAULT_GROUPS, TT_URL} from "./config.js";
-import {ls, today, uidOf, nameOf, rid, heSort} from "./util.js";
+import {ls, today, uidOf, nameOf, rid, heSort, norm, iso, DAYN} from "./util.js";
 
 const HOUSE = {A: "hA", B: "hB", C: "hC"};
 let started = false, chans = new Map(), byChan = {}, chatUnsub = null, chatCid = null, registered = false;
@@ -15,16 +15,72 @@ export const groupLabel = id => id === "all" ? "כל הצוות" : (groups().fin
 export const myGroups = () => { const d = (S.staff || []).find(x => x.id === S.user.uid); return d ? (d.groups || []).filter(groupLabel) : []; };
 const byWhen = (a, b) => (a.date + (a.from || a.time || "")).localeCompare(b.date + (b.from || b.time || ""));
 export const upcoming = col => (S[col] || []).filter(x => x.date >= today()).sort(byWhen);
-export const myDuties = () => upcoming("duties").filter(x => x.who === S.user.name);
 
 // כל אנשי הצוות: מי שמוגדר במאגר + כל מי שמופיע במערכת השעות
 export function people() {
   const m = new Map();
   for (const n of Object.keys((S.T && S.T.teachers) || {})) m.set(uidOf(n), {uid: uidOf(n), name: n, groups: [], off: false, doc: false});
-  for (const d of S.staff || []) m.set(d.id, {uid: d.id, name: d.name || nameOf(d.id), groups: (d.groups || []).filter(groupLabel), off: !!d.off, doc: true});
-  return [...m.values()].map(p => Object.assign(p, {full: fullName(p.name)})).sort((a, b) => heSort(a.full, b.full));
+  for (const d of S.staff || []) m.set(d.id, {uid: d.id, name: d.name || nameOf(d.id), groups: (d.groups || []).filter(groupLabel), off: !!d.off, doc: true, fullSet: d.full || "", aliases: d.aliases || []});
+  return [...m.values()].map(p => Object.assign({aliases: [], fullSet: ""}, p, {full: p.fullSet || fullName(p.name)})).sort((a, b) => heSort(a.full, b.full));
 }
-export const person = uid => people().find(p => p.uid === uid) || {uid, name: nameOf(uid), full: fullName(nameOf(uid)), groups: []};
+export const myFull = () => person(S.user.uid).full;
+
+// ---- התאמת שם חופשי (כמו שנכתב בגיליון של אפליקציה אחרת) לאיש צוות ----
+// סדר: כינוי שההנהלה הגדירה > שם בלוח / שם מלא > שם פרטי + תחילת שם משפחה > שם פרטי יחיד.
+export function resolver() {
+  const ps = people(), exact = new Map();
+  for (const p of ps) { exact.set(norm(p.name), p); exact.set(norm(p.full), p); }
+  for (const p of ps) for (const a of p.aliases) exact.set(norm(a), p);
+  const toks = p => norm(p.full).split(" "), cache = new Map();
+  return raw => {
+    const k = norm(raw); if (cache.has(k)) return cache.get(k);
+    let hit = exact.get(k) || null;
+    if (!hit) {
+      const [first, ...rest] = k.split(" "), cands = ps.filter(p => toks(p)[0] === first || norm(p.name).split(" ")[0] === first);
+      // כתיב חסר/מלא ("קרימר" / "קריימר") לא מפריד בין שמות משפחה
+      const loose = t => t.replace(/[יו]/g, ""), sur = p => toks(p).slice(1);
+      const fit = rest.length ? cands.filter(p => rest.every(r => sur(p).some(t => loose(t).startsWith(loose(r))))) : cands.filter(p => norm(p.name) === first);
+      // מועמד יחיד בלי התאמת שם משפחה: רק אם אין שם משפחה שסותר (לא ידוע אצלנו, או לא נכתב בגיליון)
+      hit = fit.length === 1 ? fit[0] : cands.length === 1 && (!rest.length || !sur(cands[0]).length) ? cands[0] : null;
+    }
+    cache.set(k, hit); return hit;
+  };
+}
+
+// ---- תורנות שמירה: לוח שבועי קבוע מ-data/duty.json ----
+export function loadDuty() {
+  fetch("data/duty.json", {cache: "no-cache"}).then(r => r.json()).then(j => { S.duty = j; ls("adgDuty", j); changed(); }).catch(() => { S.duty = S.duty || ls("adgDuty") || {rows: []}; changed(); });
+}
+// כל המשבצות: {day, from, to, places: [...], raw, p: איש הצוות או null}. אותו אדם באותה הפסקה בכמה מקומות = משבצת אחת.
+export function dutySlots() {
+  const res = resolver(), m = new Map();
+  for (const r of (S.duty && S.duty.rows) || []) r.days.forEach((names, day) => names.forEach(raw => {
+    const k = day + "|" + r.from + "|" + norm(raw);
+    if (!m.has(k)) m.set(k, {day, from: r.from, to: r.to, places: [], raw, p: res(raw)});
+    m.get(k).places.push(r.place);
+  }));
+  return [...m.values()].sort((a, b) => a.day - b.day || a.from.localeCompare(b.from));
+}
+export const myDuty = () => dutySlots().filter(x => x.p && x.p.uid === S.user.uid);
+// השמירה הבאה שלי: {slot, date, when: "היום" / "מחר" / "יום שלישי"}
+export function nextDuty() {
+  const now = new Date(), hm = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+  let best = null;
+  for (const x of myDuty()) {
+    let d = (x.day - now.getDay() + 7) % 7; if (d === 0 && x.to <= hm) d = 7;
+    if (!best || d < best.d || (d === best.d && x.from < best.slot.from)) best = {slot: x, d};
+  }
+  if (!best) return null;
+  const date = new Date(now); date.setDate(date.getDate() + best.d);
+  return {slot: best.slot, date: iso(date), when: best.d === 0 ? "היום" : best.d === 1 ? "מחר" : "יום " + DAYN[best.slot.day]};
+}
+export const dutyUnmatched = () => [...new Set(dutySlots().filter(x => !x.p).map(x => x.raw))].sort(heSort);
+// ההנהלה קובעת ששם מהגיליון הוא איש צוות מסוים: נשמר ככינוי אצלו (ומוסר מאחרים)
+export async function setAlias(raw, uid) {
+  for (const p of people()) if (p.uid !== uid && p.aliases.some(a => norm(a) === norm(raw))) await saveStaff(p, {aliases: p.aliases.filter(a => norm(a) !== norm(raw))});
+  if (uid) { const p = person(uid); await saveStaff(p, {aliases: [...p.aliases.filter(a => norm(a) !== norm(raw)), raw]}); }
+}
+export const person = uid => people().find(p => p.uid === uid) || {uid, name: nameOf(uid), full: fullName(nameOf(uid)), groups: [], aliases: []};
 
 export function loadTT() {
   fetch(TT_URL, {cache: "no-cache"}).then(r => r.json()).then(j => {
@@ -39,7 +95,9 @@ export function loadTT() {
 export function startData() {
   if (started) return; started = true;
   const col = (path, key) => watch(path, (list, err) => { if (err) S.err = "לא הצלחנו לטעון את הנתונים. לבדוק את האינטרנט ולפתוח שוב."; else S.err = ""; S[key] = list || S[key] || []; after(key); });
-  col("staff", "staff"); col("duties", "duties"); col("events", "events");
+  col("staff", "staff"); col("events", "events");
+  S.duty = ls("adgDuty"); loadDuty();
+  watch("photos", list => { S.photos = {}; for (const x of list || []) S.photos[x.id] = x.data; changed(); });
   watch("meta", list => { S.groupsDoc = (list || []).find(x => x.id === "groups") || {}; after("groups"); });
   watch("chats", list => { S.chats = (list || []).sort((a, b) => ((b.last || {}).at || 0) - ((a.last || {}).at || 0)); syncChat(); changed(); }, {has: ["members", S.user.uid]});
   syncChannels();
@@ -69,7 +127,7 @@ function merge() {
   changed();
 }
 export async function sendBoard(title, body, to) {
-  const mid = rid(), doc = {mid, title, body, to, by: S.user.uid, byName: fullName(S.user.name), at: Date.now()};
+  const mid = rid(), doc = {mid, title, body, to, by: S.user.uid, byName: myFull(), at: Date.now()};
   await Promise.all([...to, "s_" + S.user.uid].map(ch => put("channels/" + ch + "/msgs", mid, doc)));
 }
 export const delBoard = m => Promise.all([...(m.to || []), "s_" + m.by].map(ch => del("channels/" + ch + "/msgs", m.mid || m.id)));
@@ -101,6 +159,10 @@ export async function sendChat(other, text) {
   await put("chats", cid, {members: [me, other].sort(), names: {[me]: S.user.name, [other]: person(other).name}, last: {text: text.slice(0, 80), at, by: me}}, true);
   await put("chats/" + cid + "/msgs", null, {by: me, text, at});
 }
+
+// ---- תמונת פרופיל: photos/<uid> = {data: dataURL של JPEG קטן, at} ----
+export const savePhoto = data => put("photos", S.user.uid, {data, at: Date.now()});
+export const delPhoto = () => del("photos", S.user.uid);
 
 // ---- ניהול צוות (הנהלה) ----
 export const saveStaff = (p, patch) => put("staff", p.uid, Object.assign({name: p.name}, patch), true);

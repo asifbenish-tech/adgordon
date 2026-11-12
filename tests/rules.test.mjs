@@ -33,6 +33,16 @@ await t("cannot unblock self", no(updateDoc(doc(B, "staff/t_blocked"), {off: fal
 await t("admin sets groups", ok(setDoc(doc(A, "staff/t_two"), {name: "t_two", groups: ["hB"]}, {merge: true})));
 await t("admin edits group list", ok(setDoc(doc(A, "meta/groups"), {list: []})));
 await t("teacher cannot edit group list", no(setDoc(doc(T1, "meta/groups"), {list: []})));
+// תמונות פרופיל
+const jpg = "data:image/jpeg;base64," + "A".repeat(2000);
+await t("own photo", ok(setDoc(doc(T1, "photos/t_one"), {data: jpg, at: 1})));
+await t("staff reads photos", ok(getDocs(collection(T2, "photos"))));
+await t("cannot set someone else's photo", no(setDoc(doc(T2, "photos/t_one"), {data: jpg, at: 1})));
+await t("photo must be a small jpeg", no(setDoc(doc(T2, "photos/t_two"), {data: "data:image/jpeg;base64," + "A".repeat(100000), at: 1})));
+await t("photo cannot be html/svg", no(setDoc(doc(T2, "photos/t_two"), {data: "data:image/svg+xml;base64,AAAA", at: 1})));
+await t("blocked cannot upload photo", no(setDoc(doc(B, "photos/t_blocked"), {data: jpg, at: 1})));
+await t("cannot delete someone else's photo", no(deleteDoc(doc(T2, "photos/t_one"))));
+await t("admin removes a photo", ok(deleteDoc(doc(A, "photos/t_one"))));
 // שמירות / אירועים
 await t("teacher reads duties", ok(getDocs(collection(T1, "duties"))));
 await t("teacher cannot write duties", no(addDoc(collection(T1, "duties"), {date: "x"})));

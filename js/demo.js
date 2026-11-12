@@ -17,11 +17,6 @@ export function seed() {
       {id: u(0), name: o(0), groups: ["mgmt"]}, {id: u(1), name: o(1), groups: ["hA", "home"]},
       {id: u(2), name: o(2), groups: ["hA"]}, {id: u(3), name: o(3), groups: ["hB", "home"]}, {id: u(4), name: o(4), groups: ["hC"]}],
     meta: [],
-    duties: [
-      {id: "d1", date: dd(1), from: "07:30", to: "08:00", place: "שער ראשי", who: me.name, note: ""},
-      {id: "d2", date: dd(1), from: "13:15", to: "13:45", place: "רחבת ההסעות", who: o(0), note: ""},
-      {id: "d3", date: dd(3), from: "10:00", to: "10:25", place: "חצר היסודי", who: o(1), note: ""},
-      {id: "d4", date: dd(6), from: "13:15", to: "13:45", place: "רחבת ההסעות", who: me.name, note: ""}],
     events: [
       {id: "e1", date: dd(2), time: "16:00", title: "אסיפת הורים", place: "בכיתות", note: ""},
       {id: "e2", date: dd(9), time: "", title: "יום טיול שכבתי", place: "", note: "שכבת ו"},
