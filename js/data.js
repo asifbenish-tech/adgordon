@@ -1,7 +1,7 @@
 // הנתונים החיים: צוות וקבוצות, שמירות, אירועים, לוח הודעות ושיחות פרטיות.
 // המבנה ב-Firestore מתועד ב-INTEGRATION.md, וההרשאות ב-firestore.rules.
 import {S, changed} from "./state.js";
-import {watch, put, del} from "./store.js";
+import {watch, watchDoc, put, del} from "./store.js";
 import {DEFAULT_GROUPS, TT_URL, EVENTS_URL} from "./config.js";
 import {ls, today, uidOf, nameOf, rid, heSort, norm, iso, DAYN} from "./util.js";
 
@@ -100,6 +100,7 @@ export function startData() {
   const col = (path, key) => watch(path, (list, err) => { if (err) S.err = "לא הצלחנו לטעון את הנתונים. לבדוק את האינטרנט ולפתוח שוב."; else S.err = ""; S[key] = list || S[key] || []; after(key); });
   col("staff", "staff"); col("events", "events");
   S.duty = ls("adgDuty"); loadDuty(); loadSheet();
+  watchDoc("staffAuth", S.user.uid, d => { S.myAuth = d || {}; changed(); });
   watch("photos", list => { S.photos = {}; for (const x of list || []) S.photos[x.id] = x.data; changed(); });
   watch("meta", list => { S.groupsDoc = (list || []).find(x => x.id === "groups") || {}; after("groups"); });
   watch("chats", list => { S.chats = (list || []).sort((a, b) => ((b.last || {}).at || 0) - ((a.last || {}).at || 0)); syncChat(); changed(); }, {has: ["members", S.user.uid]});
@@ -208,6 +209,12 @@ export function calDays() {
     m.get(e.date).acts.push({t: e.title + (e.time ? " · " + e.time : "") + (e.place ? " · " + e.place : "") + (e.note ? " · " + e.note : ""), k: kindOf(e.title), id: e.id});
   }
   return [...m.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// ---- עדכון הפרטים של עצמי: שם מלא וטלפון ב-staff, מייל ב-staffAuth. אותם מסמכים שאפליקציית ניהול הצוות עורכת. ----
+export async function saveMine(full, phone, email) {
+  await put("staff", S.user.uid, {full, phone}, true);
+  if (email !== undefined && S.myAuth && S.myAuth.id && email !== (S.myAuth.email || "")) await put("staffAuth", S.user.uid, {email}, true);
 }
 
 // ---- תמונת פרופיל: photos/<uid> = {data: dataURL של JPEG קטן, at} ----

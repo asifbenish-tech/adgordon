@@ -9,6 +9,7 @@ let impl = null;
 export const watch = (path, cb, opt) => impl.watch(path, cb, opt || {});
 export const put = (path, id, obj, merge) => impl.put(path, id, obj, !!merge);
 export const del = (path, id) => impl.del(path, id);
+export const watchDoc = (path, id, cb) => impl.watchDoc(path, id, cb);   // מסמך יחיד: cb(doc | null)
 
 export async function openStore(fbApp) {
   if (impl) return;
@@ -27,6 +28,7 @@ async function fireStore(fbApp) {
       if (opt.recent) q = Fs.query(q, Fs.orderBy("at", "desc"), Fs.limit(opt.recent));
       return Fs.onSnapshot(q, snap => cb(snap.docs.map(d => Object.assign({id: d.id}, d.data()))), err => cb(null, err));
     },
+    watchDoc: (path, id, cb) => Fs.onSnapshot(Fs.doc(db, path, id), d => cb(d.exists() ? Object.assign({id: d.id}, d.data()) : null), () => cb(null)),
     put: (path, id, obj, merge) => id ? Fs.setDoc(Fs.doc(db, path, id), obj, {merge}) : Fs.addDoc(Fs.collection(db, path), obj),
     del: (path, id) => Fs.deleteDoc(Fs.doc(db, path, id))
   };
@@ -44,6 +46,7 @@ function demoStore() {
   };
   const emit = path => { ls("adgDemoData", db); for (const w of ws) if (w.path === path) w.cb(view(w)); };
   return {
+    watchDoc(path, id, cb) { return this.watch(path, list => cb(list.find(x => x.id === id) || null), {}); },
     watch(path, cb, opt) { const w = {path, cb, opt}; ws.add(w); setTimeout(() => ws.has(w) && cb(view(w)), 0); return () => ws.delete(w); },
     async put(path, id, obj, merge) {
       const list = db[path] = db[path] || [], i = id ? list.findIndex(x => x.id === id) : -1;

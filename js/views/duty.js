@@ -36,6 +36,7 @@ function boardHtml() {
 }
 
 export default {
+  parent: "me", tab: "",
   title: () => "תורנות שמירה",
   html() {
     if (S.duty == null || S.staff == null) return loading;

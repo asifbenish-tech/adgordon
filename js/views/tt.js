@@ -23,6 +23,7 @@ export const slotHtml = s => s.ev.length
   : '<div class="slot free"><div class="hour"><small>שעה</small><b>' + s.h + '</b></div><div class="what"><b>פנוי</b></div></div>';
 
 export default {
+  parent: "me", tab: "",
   title: () => "המערכת שלי",
   html() {
     const T = S.T;

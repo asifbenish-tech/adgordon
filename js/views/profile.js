@@ -2,8 +2,8 @@
 // אין Cloud Storage (תוכנית חינם), ולכן התמונה מוקטנת ל-192x192 ונשמרת כטקסט ב-Firestore: photos/<uid>.
 import {S} from "../state.js";
 import {$, esc} from "../util.js";
-import {myFull, myGroups, savePhoto, delPhoto} from "../data.js";
-import {tags, avatar, ui, tryDo} from "../ui.js";
+import {myFull, myGroups, person, savePhoto, delPhoto, saveMine} from "../data.js";
+import {tags, avatar, field, ui, tryDo} from "../ui.js";
 import {pushCard, bindPush} from "../push.js";
 
 const OUT = 192, VIEW = 600;   // גודל התמונה הנשמרת; רזולוציית משטח העריכה
@@ -32,24 +32,35 @@ function load(file) {
 }
 
 export default {
-  parent: "home", tab: "home", live: true,
-  title: () => ed ? "עריכת התמונה" : "הפרופיל שלי",
+  parent: "me", tab: "", live: true,
+  title: () => ed ? "עריכת התמונה" : "עדכון פרטים",
   html() {
     if (ed) return '<div class="stage"><canvas id="pcan" width="' + VIEW + '" height="' + VIEW + '" aria-label="התמונה. גוררים כדי להזיז"></canvas><div class="ring"></div></div>' +
       '<p class="hint center">גוררים כדי להזיז. מה שבתוך העיגול הוא מה שיופיע.</p>' +
       '<label class="zoom"><i class="fa-solid fa-magnifying-glass-minus"></i><input id="pzoom" type="range" min="1" max="4" step="0.01" value="1" aria-label="הגדלה"><i class="fa-solid fa-magnifying-glass-plus"></i></label>' +
       '<div class="two"><button type="button" class="btn" id="psave">שמירה</button><button type="button" class="btn ghost" id="pcancel">ביטול</button></div>' +
       '<button type="button" class="btn ghost small" id="prot"><i class="fa-solid fa-rotate-right"></i> סיבוב התמונה</button>';
-    const g = S.staff ? myGroups() : [], has = !!(S.photos && S.photos[S.user.uid]);
+    const g = S.staff ? myGroups() : [], has = !!(S.photos && S.photos[S.user.uid]), me = person(S.user.uid), canMail = !!(S.myAuth && S.myAuth.id);
     return '<div class="card prof"><div class="big">' + avatar(S.user) + "</div><b>" + esc(myFull()) + '</b><div class="tags">' + tags(g) + "</div></div>" +
       '<label class="btn filebtn"><i class="fa-solid fa-camera"></i> ' + (has ? "החלפת התמונה" : "הוספת תמונה") + '<input id="pfile" type="file" accept="image/*"></label>' +
       (has ? '<button type="button" class="btn ghost" id="pdel"><i class="fa-solid fa-trash-can"></i> הסרת התמונה</button>' : "") +
-      '<p class="hint center">התמונה תופיע ליד השם שלך בהודעות, בשיחות וברשימת הצוות. רואים אותה רק אנשי הצוות.</p>' + pushCard();
+      '<p class="hint center">התמונה תופיע ליד השם שלך בהודעות, בשיחות וברשימת הצוות. רואים אותה רק אנשי הצוות.</p>' +
+      '<form class="card dform" id="dform"><h3>הפרטים שלי</h3>' + field("שם מלא", '<input name="full" required maxlength="50" value="' + esc(me.full) + '">') +
+      field("טלפון נייד", '<input name="phone" type="tel" dir="ltr" inputmode="tel" maxlength="20" value="' + esc(me.phone || "") + '">') +
+      (canMail ? field("מייל (אליו נשלח קוד הכניסה)", '<input name="email" type="email" dir="ltr" required maxlength="80" value="' + esc(S.myAuth.email || "") + '">') : "") +
+      '<button class="btn">שמירת הפרטים</button><p class="hint">הטלפון מופיע בדף אנשי הצוות. שיוך לבית, מחנכים וצוות ניהול מעדכנת ההנהלה.</p></form>' + pushCard();
   },
   bind() {
     if (!ed) {
       $("pfile").onchange = e => load(e.target.files[0]);
       bindPush(() => ui.render());
+      $("dform").onsubmit = async e => {
+        e.preventDefault();
+        const fd = new FormData(e.target), v = k => fd.has(k) ? String(fd.get(k)).trim() : undefined, btn = e.target.querySelector(".btn");
+        if (fd.has("email") && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v("email"))) { alert("כתובת המייל לא תקינה."); return; }
+        btn.disabled = true; document.activeElement.blur();
+        if (await tryDo(() => saveMine(v("full"), v("phone") || "", v("email")), "הפרטים לא נשמרו. לבדוק את האינטרנט ולנסות שוב.")) { btn.textContent = "נשמר ✓"; setTimeout(() => ui.render(), 900); } else btn.disabled = false;
+      };
       const d = $("pdel"); if (d) d.onclick = async () => { if (confirm("להסיר את התמונה?") && await tryDo(delPhoto)) ui.render(); };
       return;
     }
@@ -75,5 +86,5 @@ export default {
     };
     draw();
   },
-  update() { if (!ed) ui.render(); }   // עדכון נתונים ברקע לא מאפס עריכה באמצע
+  update() { const a = document.activeElement; if (!ed && !(a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.type !== "file")) ui.render(); }   // עדכון נתונים ברקע לא מאפס עריכה באמצע
 };

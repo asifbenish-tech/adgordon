@@ -282,3 +282,25 @@ body.hero .mebtn .av{width:48px;height:48px;font-size:1.2rem}
 .btn.danger{background:transparent;color:var(--red);border:1px solid color-mix(in srgb,var(--red) 40%,var(--line))}
 .call{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:var(--green);background:color-mix(in srgb,var(--green) 13%,transparent);cursor:pointer}
 .hint i{margin-inline-end:4px}
+
+/* פורטל המידע ומאגר הפעילויות */
+.pcard{--c:var(--brand-ink);align-items:flex-start}
+.pcard .ico{color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent)}
+.pcard.urgent{border-color:color-mix(in srgb,var(--c) 45%,var(--line))}
+.pcard span{line-height:1.45}
+.pcard small{font-size:.74rem;margin-top:3px}
+.pcard .go{align-self:center}
+.pnote{color:var(--warn)!important;font-size:.8rem!important}
+.ico.rose{color:#e11d48;background:color-mix(in srgb,#e11d48 12%,transparent)}
+.ico.violet{color:#7c3aed;background:color-mix(in srgb,#7c3aed 13%,transparent)}
+@media (prefers-color-scheme:dark){.pcard .ico{color:color-mix(in srgb,var(--c) 55%,#fff)}.ico.rose{color:#fb7185}.ico.violet{color:#b79bff}}
+.parts{margin:2px 0;padding:0;list-style:none;display:grid;gap:4px;font-size:.9rem}
+.parts b{font-size:.9rem;margin-inline-end:4px}
+.files{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.files .btn{width:auto;flex:1;min-width:140px}
+/* האזור האישי ועדכון פרטים */
+.prof .big{display:block;border-radius:50%;text-decoration:none}
+.prof>span{font-size:.88rem;color:var(--muted)}
+.dform{display:grid;gap:12px}
+.dform h3{font-size:1.02rem;font-weight:800;color:var(--ink)}
+.dform .field :is(input,select){background:var(--surface-2)}

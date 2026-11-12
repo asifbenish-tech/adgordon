@@ -37,12 +37,25 @@ await t("teacher cannot edit group list", no(setDoc(doc(T1, "meta/groups"), {lis
 await t("admin writes login details", ok(setDoc(doc(A, "staffAuth/t_one"), {name: "t_one", h: ["x"], email: "a@b.c", role: "teacher"})));
 await t("admin reads login details", ok(getDocs(collection(A, "staffAuth"))));
 await t("teacher cannot read login details", no(getDocs(collection(T1, "staffAuth"))));
-await t("teacher cannot read own login details", no(getDoc(doc(T1, "staffAuth/t_one"))));
 await t("teacher cannot write login details", no(setDoc(doc(T1, "staffAuth/t_one"), {h: ["mine"]})));
 await t("own push registration", ok(setDoc(doc(T1, "push/t_one"), {tokens: {a: 1}, duty: []}, {merge: true})));
 await t("cannot read others' push registration", no(getDoc(doc(T2, "push/t_one"))));
 await t("cannot write others' push registration", no(setDoc(doc(T2, "push/t_one"), {tokens: {evil: 1}})));
 await t("admin cannot read push tokens", no(getDoc(doc(A, "push/t_one"))));
+// עדכון פרטים עצמי: שם מלא, טלפון, מייל - ושום דבר אחר
+await t("own full name and phone", ok(setDoc(doc(T1, "staff/t_one"), {full: "אחד מלא", phone: "050-1234567"}, {merge: true})));
+await t("cannot add self to a group via details", no(setDoc(doc(T1, "staff/t_one"), {phone: "1", groups: ["mgmt"]}, {merge: true})));
+await t("cannot set own role via details", no(setDoc(doc(T1, "staff/t_one"), {phone: "1", role: "admin"}, {merge: true})));
+await t("cannot unblock via details", no(setDoc(doc(B, "staff/t_blocked"), {off: false}, {merge: true})));
+await t("cannot edit someone else's details", no(setDoc(doc(T2, "staff/t_one"), {phone: "666"}, {merge: true})));
+await t("phone too long refused", no(setDoc(doc(T1, "staff/t_one"), {phone: "1".repeat(40)}, {merge: true})));
+await t("reads own login record", ok(getDoc(doc(T1, "staffAuth/t_one"))));
+await t("cannot read another's login record", no(getDoc(doc(T2, "staffAuth/t_one"))));
+await t("updates own email", ok(setDoc(doc(T1, "staffAuth/t_one"), {email: "new@b.c"}, {merge: true})));
+await t("cannot replace own id hash", no(setDoc(doc(T1, "staffAuth/t_one"), {h: ["other"]}, {merge: true})));
+await t("cannot change own role in login record", no(setDoc(doc(T1, "staffAuth/t_one"), {email: "x@y.z", role: "admin"}, {merge: true})));
+await t("cannot create own login record", no(setDoc(doc(T2, "staffAuth/t_two"), {email: "x@y.z"}, {merge: true})));
+await t("cannot change another's email", no(setDoc(doc(T2, "staffAuth/t_one"), {email: "evil@x.y"}, {merge: true})));
 // תפקיד מהמאגר גובר על האסימון, מיד
 await t("teacher cannot make self admin", no(updateDoc(doc(T2, "staff/t_two"), {role: "admin"})));
 await t("admin promotes a teacher", ok(setDoc(doc(A, "staff/t_two"), {role: "admin"}, {merge: true})));

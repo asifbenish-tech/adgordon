@@ -21,7 +21,12 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['name', 'groups'])
         && request.resource.data.name == request.auth.token.n
         && request.resource.data.groups == []);
-      allow update, delete: if admin();
+      // כל אחד מעדכן לעצמו רק שם מלא וטלפון ("עדכון פרטים"); כל השאר - ההנהלה
+      allow update: if admin() || (staff() && uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['full', 'phone'])
+        && request.resource.data.get('full', '') is string && request.resource.data.get('full', '').size() <= 60
+        && request.resource.data.get('phone', '') is string && request.resource.data.get('phone', '').size() <= 25);
+      allow delete: if admin();
     }
     // תמונת פרופיל: כל אחד מעלה רק את שלו. JPEG קטן כטקסט (אין Cloud Storage בתוכנית החינם).
     match /photos/{uid} {
@@ -34,7 +39,14 @@ service cloud.firestore {
       allow delete: if staff() && (uid == request.auth.uid || admin());
     }
     // פרטי הכניסה (גיבובי ת"ז, מייל, תפקיד): הנהלה בלבד. שרת הכניסה קורא אותם עם חשבון השירות.
-    match /staffAuth/{uid} { allow read, write: if admin(); }
+    // כל אחד רואה את הרשומה של עצמו ומעדכן בה רק את המייל; ת"ז ותפקיד - רק ההנהלה.
+    match /staffAuth/{uid} {
+      allow read, write: if admin();
+      allow get: if staff() && uid == request.auth.uid;
+      allow update: if staff() && uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email'])
+        && request.resource.data.email is string && request.resource.data.email.size() <= 100;
+    }
     // רישום להתראות: כל אחד רואה ומעדכן רק את שלו (אסימוני המכשירים + השמירות שלו). ההנהלה יכולה למחוק.
     match /push/{uid} {
       allow read, create, update: if staff() && uid == request.auth.uid;

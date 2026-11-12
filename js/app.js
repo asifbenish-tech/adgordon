@@ -13,9 +13,12 @@ import cal from "./views/cal.js";
 import {msg, chat, pick} from "./views/msg.js";
 import staff from "./views/staff.js";
 import profile from "./views/profile.js";
+import menu from "./views/menu.js";
+import {portal, bank} from "./views/portal.js";
 
-const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: profile};
-const TABS = [["home", "היום", "fa-house"], ["msg", "הודעות", "fa-comments"], ["tt", "מערכת", "fa-table-cells"], ["duty", "שמירות", "fa-shield-halved"], ["cal", "אירועים", "fa-calendar-days"]];
+const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: menu, edit: profile, portal, bank};
+// המערכת והשמירות נמצאות באזור האישי (לחיצה על התמונה למעלה)
+const TABS = [["home", "היום", "fa-house"], ["msg", "הודעות", "fa-comments"], ["cal", "אירועים", "fa-calendar-days"], ["portal", "מידע", "fa-book-open"]];
 let last = "";
 
 export const route = () => { const [name, arg] = location.hash.replace(/^#\/?/, "").split("/"); return {name: VIEWS[name] ? name : "home", arg: arg ? decodeURIComponent(arg) : ""}; };
@@ -26,7 +29,7 @@ function render(force) {
   document.body.classList.toggle("in", !!S.user);
   if (!S.ready) { el.innerHTML = '<p class="lead">טוען…</p>'; return; }
   if (!S.user) { document.body.classList.remove("hero"); $("sub").textContent = "אפליקציית הצוות"; $("title").textContent = "בית חינוך א.ד. גורדון"; $("back").hidden = true; el.innerHTML = loginHtml(); bindLogin(); last = ""; return; }
-  const tab = v.tab || r.name;
+  const tab = v.tab != null ? v.tab : r.name;
   for (const a of $("tabs").children) a.setAttribute("aria-current", a.dataset.t === tab ? "page" : "false");
   badge();
   $("title").textContent = v.title(r.arg);
@@ -51,7 +54,7 @@ function badge() {
 }
 
 $("tabs").innerHTML = TABS.map(t => '<a href="#/' + t[0] + '" data-t="' + t[0] + '"><i class="fa-solid ' + t[2] + '"></i><span>' + t[1] + "</span><em hidden></em></a>").join("");
-$("back").onclick = () => go(VIEWS[route().name].parent || "home");
+$("back").onclick = () => { const r = route(), v = VIEWS[r.name]; go((v.back && v.back(r.arg)) || v.parent || "home"); };
 ui.render = () => render(true);
 window.addEventListener("hashchange", () => render(true));
 onChange(() => { render(false); syncPush().catch(() => {}); });

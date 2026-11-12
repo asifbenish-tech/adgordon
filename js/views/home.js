@@ -36,11 +36,10 @@ export default {
     h += secHead("בימים הקרובים", "#/cal", "ללוח המלא");
     h += !days ? loading : soon.length ? soon.slice(0, 4).map(x => dayCard(x, {plain: true})).join("") : empty(S.sheet.err ? "לא הצלחנו לקרוא את לוח האירועים" : "אין אירועים קרובים");
     h += secHead("עוד") + '<div class="list">' + (isAdmin() ? '<a class="item" href="#/staff"><div class="ico blue"><i class="fa-solid fa-users-gear"></i></div><div><b>ניהול צוות וקבוצות</b><span>מי שייך לאיזה בית, מחנכים, צוות ניהול</span></div><i class="fa-solid fa-chevron-left go"></i></a>' : "") +
-      '<a class="item" href="' + PORTAL_URL + '" target="_blank" rel="noopener"><div class="ico blue"><i class="fa-solid fa-book-open"></i></div><div><b>פורטל המידע לצוות</b><span>טפסים, דיווחים וקישורים</span></div><i class="fa-solid fa-chevron-left go"></i></a>' +
-      '<div class="item who"><a class="avlink" href="#/me" aria-label="הפרופיל שלי">' + avatar(u) + "</a><div><b>" + esc(myFull()) + "</b><span>" + esc(ROLE[u.role] || "צוות בית החינוך") + ' · <a href="#/me">תמונה ופרופיל</a></span>' +
-      (g.length ? '<div class="tags">' + tags(g) + "</div>" : "") + '</div><button type="button" class="link" id="out">יציאה</button></div></div>';
+      '<a class="item who" href="#/me">' + avatar(u) + "<div><b>" + esc(myFull()) + "</b><span>" + esc(ROLE[u.role] || "צוות בית החינוך") + " · המערכת שלי, שמירות ועדכון פרטים</span>" +
+      (g.length ? '<div class="tags">' + tags(g) + "</div>" : "") + '</div><i class="fa-solid fa-chevron-left go"></i></a></div>';
     return h;
   },
-  bind() { $("out").onclick = signOut; }
+  bind() {}
 };
 export const dateLine = () => { const d = new Date(); return "יום " + DAYN[d.getDay()] + " · " + d.toLocaleDateString("he-IL", {day: "numeric", month: "long"}); };
