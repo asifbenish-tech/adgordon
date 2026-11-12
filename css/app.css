@@ -304,3 +304,12 @@ body.hero .mebtn .av{width:48px;height:48px;font-size:1.2rem}
 .dform{display:grid;gap:12px}
 .dform h3{font-size:1.02rem;font-weight:800;color:var(--ink)}
 .dform .field :is(input,select){background:var(--surface-2)}
+
+/* אישור הגעה לשמירה */
+.arrive{display:grid;gap:8px;border:0;color:#fff;background:linear-gradient(120deg,#e07a0c,#b4530a);box-shadow:0 14px 26px -16px rgba(180,83,9,.9)}
+.arrive b{font-size:1.08rem;color:#fff}
+.arrive b i{margin-inline-end:4px}
+.arrive span{font-size:.9rem;color:rgba(255,255,255,.92)}
+.arrive .btn{background:#fff;color:#9a3f06;font-size:1.05rem}
+.arrive.done{background:linear-gradient(120deg,#0f9d6b,#067647);box-shadow:0 14px 26px -16px rgba(6,118,71,.9)}
+.okmark{color:var(--green);font-size:.85em}

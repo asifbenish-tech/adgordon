@@ -67,6 +67,7 @@ function doPost(e) {
     else if (r.a === "verify") out = verify_(String(r.h || ""), String(r.c || ""));
     else if (r.a === "import") out = import_(String(r.t || ""));
     else if (r.a === "pushtest") out = pushTest_(String(r.t || ""));
+    else if (r.a === "notify") out = notify_(r);
     else out = {ok: false, error: "פעולה לא מוכרת."};
   } catch (err) { out = {ok: false, error: "שגיאה בשרת: " + err.message}; }
   return json_(out);
@@ -180,15 +181,18 @@ function import_(idToken) {
   return {ok: true, added: added, total: Object.keys(by).length};
 }
 
-// מי מחזיק באסימון הזה (ID token של Firebase): {uid, n, r}
+// מי מחזיק באסימון הזה (ID token של Firebase): {uid, n, r}.
+// Google מאמתת את האסימון (accounts:lookup נכשל על אסימון מזויף או פג תוקף). השם והתפקיד נקראים מגוף האסימון עצמו,
+// כי מה ששרת הכניסה חתם באסימון הכניסה לא נשמר ברשומת המשתמש.
 function whoIs_(idToken) {
-  if (!idToken) return null;
+  if (!idToken || idToken.split(".").length !== 3) return null;
   var r = UrlFetchApp.fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + API_KEY, {
     method: "post", contentType: "application/json", muteHttpExceptions: true, payload: JSON.stringify({idToken: idToken})});
   if (r.getResponseCode() !== 200) return null;
-  var u = (JSON.parse(r.getContentText()).users || [])[0];
+  var u = (JSON.parse(r.getContentText()).users || [])[0], c;
   if (!u) return null;
-  var c = {}; try { c = JSON.parse(u.customAttributes || "{}"); } catch (err) {}
+  try { c = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(idToken.split(".")[1])).getDataAsString("UTF-8")); } catch (err) { return null; }
+  if ((c.user_id || c.sub) !== u.localId) return null;
   return {uid: u.localId, n: c.n || "", r: c.r || ""};
 }
 
@@ -247,31 +251,85 @@ function fsPatch_(path, obj, mask) {
 // ---- התראות דחיפה על תורנות שמירה ----
 // כל מכשיר שהפעיל התראות כותב ל-push/<uid>: {tokens: {<אסימון FCM>: זמן}, duty: [{day, from, to, place}]}.
 // tick רץ כל 5 דקות (הטריגר נוצר ב-setup) ושולח התראה 5-12 דקות לפני תחילת שמירה. פעם אחת לכל שמירה.
-var LEAD_MIN = 5, LEAD_MAX = 12;
+// סביב כל שמירה שלושה שלבים (הטריגר רץ כל 5 דקות, ולכן כל חלון רחב 5 דקות לפחות; מטמון מונע כפילות):
+//   5-12 דקות לפני      -> תזכורת לשומר/ת
+//   0-5 דקות אחרי ההתחלה -> "הגעת לשמירה?" לשומר/ת, אם עוד לא אישר/ה
+//   5-10 דקות אחרי       -> אם אין אישור הגעה (checkins/<תאריך>_<uid>_<שעה>): התראה לאחראי הביטחון (קבוצת sec)
+// push/<uid>.duty נכתב ע"י האפליקציה של כל איש צוות (גם בלי התראות), ולכן רק מי שמשתמש באפליקציה נבדק.
+var LEAD_MIN = 5, LEAD_MAX = 12, LATE_MIN = 5, LATE_MAX = 10, SEC_GROUP = "sec";
 function tick() {
   var p = Utilities.formatDate(new Date(), "Asia/Jerusalem", "u|HH|mm|yyyy-MM-dd").split("|");
   var day = Number(p[0]) % 7, mins = Number(p[1]) * 60 + Number(p[2]), sent = 0;   // u: שני=1 ... ראשון=7 -> ראשון=0
   if (day === 6 || mins < 6 * 60 + 30 || mins > 16 * 60) return 0;
-  var c = CacheService.getScriptCache();
-  fsList_("push").forEach(function (d) {
+  var c = CacheService.getScriptCache(), docs = fsList_("push"), sec = null;
+  var once = function (key) { if (c.get(key)) return false; c.put(key, "1", 3600); return true; };
+  var toAll = function (d, title, body) { Object.keys(d.tokens || {}).forEach(function (tok) { if (push_(tok, title, body, "#/duty")) sent++; }); };
+  docs.forEach(function (d) {
     (d.duty || []).forEach(function (s) {
-      var t = String(s.from || "").split(":"), lead = Number(t[0]) * 60 + Number(t[1]) - mins;
-      if (s.day !== day || !(lead >= LEAD_MIN && lead <= LEAD_MAX)) return;
-      var key = "p_" + d.id + "_" + p[3] + "_" + s.from;
-      if (c.get(key)) return;
-      c.put(key, "1", 3600);
-      Object.keys(d.tokens || {}).forEach(function (tok) {
-        if (push_(tok, "שמירה בעוד " + lead + " דקות", s.place + " · " + s.from + "–" + s.to, "#/duty")) sent++;
-      });
+      if (s.day !== day) return;
+      var t = String(s.from || "").split(":"), late = mins - (Number(t[0]) * 60 + Number(t[1])), id = p[3] + "_" + d.id + "_" + s.from;
+      if (-late >= LEAD_MIN && -late <= LEAD_MAX) { if (once("p_" + id)) toAll(d, "שמירה בעוד " + (-late) + " דקות", s.place + " · " + s.from + "–" + s.to); return; }
+      if (late >= 0 && late < LATE_MIN) { if (once("a_" + id) && !checked_(id)) toAll(d, "הגעת לשמירה?", s.place + " · לאשר הגעה באפליקציה"); return; }
+      if (late >= LATE_MIN && late < LATE_MAX && once("n_" + id) && !checked_(id)) {
+        if (!sec) sec = secTokens_(docs);
+        sec.forEach(function (tok) { if (push_(tok, "לא אושרה הגעה לשמירה", (d.name || "איש צוות") + " · " + s.place + " · " + s.from + "–" + s.to, "#/duty")) sent++; });
+        log_("noshow", d.name || d.id, s.place + " " + s.from);
+      }
     });
   });
   return sent;
 }
-function push_(token, title, body, url) {
-  var r = UrlFetchApp.fetch("https://fcm.googleapis.com/v1/projects/" + PROJECT_ID + "/messages:send", {method: "post", contentType: "application/json", muteHttpExceptions: true,
-    headers: {Authorization: "Bearer " + oauth_()},
-    payload: JSON.stringify({message: {token: token, data: {title: title, body: body, url: url || ""}, webpush: {headers: {Urgency: "high", TTL: "900"}}}})});
+function checked_(id) {
+  var r = UrlFetchApp.fetch(FS + "checkins/" + encodeURIComponent(id), {headers: {Authorization: "Bearer " + oauth_()}, muteHttpExceptions: true});
   return r.getResponseCode() === 200;
+}
+// אסימוני המכשירים של אחראי הביטחון
+function secTokens_(pushDocs) {
+  var ids = {}, out = [];
+  fsList_("staff").forEach(function (x) { if (!x.off && !x.removed && (x.groups || []).indexOf(SEC_GROUP) >= 0) ids[x.id] = 1; });
+  pushDocs.forEach(function (d) { if (ids[d.id]) out = out.concat(Object.keys(d.tokens || {})); });
+  return out;
+}
+
+// ---- התראה על הודעה חדשה. האפליקציה של השולח קוראת לזה מיד אחרי השליחה: {a:"notify", t:<אסימון>, kind, to, title, text} ----
+// kind: "board" (to = ["all"] או מזהי קבוצות), "mgmt" (תיבת צוות הניהול), "chat" (to = uid של הנמען).
+var NOTIFY_HOUR = 60;   // עד 60 הודעות עם התראה לשעה לשולח אחד
+function notify_(r) {
+  var who = whoIs_(String(r.t || ""));
+  if (!who) return {ok: false, error: "צריך להיכנס מחדש."};
+  var c = CacheService.getScriptCache(), k = "q_" + who.uid + "_" + Math.floor(Date.now() / 3600000), n = Number(c.get(k) || 0);
+  if (n >= NOTIFY_HOUR) return {ok: false, error: "יותר מדי הודעות בשעה האחרונה."};
+  c.put(k, String(n + 1), 3600);
+  var staff = fsList_("staff"), me = staff.filter(function (x) { return x.id === who.uid; })[0] || {}, mine = me.groups || [];
+  if (me.off) return {ok: false, error: "החשבון חסום."};
+  var clip = function (x, m) { x = String(x || "").replace(/\s+/g, " ").trim(); return x.length > m ? x.slice(0, m - 1) + "…" : x; };
+  var from = me.full || who.n, to = Array.isArray(r.to) ? r.to.map(String) : [String(r.to || "")], ids = {}, title, body, url;
+  if (r.kind === "chat") { ids[to[0]] = 1; title = from; body = clip(r.text, 120); url = "#/chat/" + who.uid; }
+  else if (r.kind === "mgmt") {
+    if (mine.indexOf("mgmt") < 0) return {ok: false, error: "רק חברי צוות הניהול."};
+    staff.forEach(function (x) { if ((x.groups || []).indexOf("mgmt") >= 0) ids[x.id] = 1; });
+    title = "צוות ניהול: " + clip(r.title, 60); body = from + " · " + clip(r.text, 100); url = "#/msg";
+  } else if (r.kind === "board") {
+    to = to.filter(function (g) { return g !== "mgmt"; });
+    staff.forEach(function (x) { if (to.indexOf("all") >= 0 || (x.groups || []).some(function (g) { return to.indexOf(g) >= 0; })) ids[x.id] = 1; });
+    title = "הודעה חדשה: " + clip(r.title, 60); body = from + " · " + clip(r.text, 100); url = "#/msg";
+  } else return {ok: false, error: "סוג לא מוכר."};
+  delete ids[who.uid];
+  staff.forEach(function (x) { if (x.off || x.removed) delete ids[x.id]; });
+  var toks = [];
+  fsList_("push").forEach(function (d) { if (ids[d.id]) toks = toks.concat(Object.keys(d.tokens || {})); });
+  if (!toks.length) return {ok: true, sent: 0};
+  var res = UrlFetchApp.fetchAll(toks.map(function (tok) { return pushReq_(tok, title, body, url); }));
+  return {ok: true, sent: res.filter(function (x) { return x.getResponseCode() === 200; }).length};
+}
+function pushReq_(token, title, body, url) {
+  return {url: "https://fcm.googleapis.com/v1/projects/" + PROJECT_ID + "/messages:send", method: "post", contentType: "application/json", muteHttpExceptions: true,
+    headers: {Authorization: "Bearer " + oauth_()},
+    payload: JSON.stringify({message: {token: token, data: {title: title, body: body, url: url || ""}, webpush: {headers: {Urgency: "high", TTL: "900"}}}})};
+}
+function push_(token, title, body, url) {
+  var q = pushReq_(token, title, body, url), u = q.url; delete q.url;
+  return UrlFetchApp.fetch(u, q).getResponseCode() === 200;
 }
 // "שליחת התראת בדיקה" מהאפליקציה: לכל המכשירים של מי שביקש
 function pushTest_(idToken) {

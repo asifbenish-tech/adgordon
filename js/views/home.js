@@ -8,6 +8,8 @@ import {loading, empty, secHead, tags, avatar} from "../ui.js";
 import {slots, slotHtml, todayIdx} from "./tt.js";
 import {boardItem} from "./msg.js";
 import {dayCard} from "./cal.js";
+import {nowCard, bindNow} from "./duty.js";
+import {ui} from "../ui.js";
 import {today} from "../util.js";
 
 const ROLE = {admin: "הנהלה", coordinator: "ריכוז בית", teacher: "צוות הוראה"};
@@ -23,7 +25,8 @@ export default {
     let h = "";
     // מה קורה היום בבית החינוך: חג, חופשה, אירוע, מבחנים - מלוח האירועים וההערכות
     if (td) h += '<div class="todaybox"><h3><i class="fa-solid fa-bullhorn"></i> היום בבית החינוך</h3>' + dayCard(td, {plain: true}) + "</div>";
-    if (nd) h += '<a class="item duty next" href="#/duty"><div class="ico"><i class="fa-solid fa-shield-halved"></i></div><div><small>' + (nd.when === "היום" ? "יש לך שמירה היום" : "השמירה הבאה שלך") + "</small><b>" +
+    const nc = nowCard(); h += nc;
+    if (nd && !nc) h += '<a class="item duty next" href="#/duty"><div class="ico"><i class="fa-solid fa-shield-halved"></i></div><div><small>' + (nd.when === "היום" ? "יש לך שמירה היום" : "השמירה הבאה שלך") + "</small><b>" +
       esc(nd.when) + " · " + esc(nd.slot.from.replace(/^0/, "")) + "–" + esc(nd.slot.to.replace(/^0/, "")) + "</b><span>" + esc(nd.slot.places.join(" + ")) + '</span></div><i class="fa-solid fa-chevron-left go"></i></a>';
     h += '<div class="tiles">' +
       tile("#/msg", "fa-comments", "t1", un || '<i class="fa-solid fa-check"></i>', un ? (un === 1 ? "הודעה חדשה" : "הודעות חדשות") : "אין הודעות חדשות") +
@@ -40,6 +43,6 @@ export default {
       (g.length ? '<div class="tags">' + tags(g) + "</div>" : "") + '</div><i class="fa-solid fa-chevron-left go"></i></a></div>';
     return h;
   },
-  bind() {}
+  bind() { bindNow(() => ui.render()); }
 };
 export const dateLine = () => { const d = new Date(); return "יום " + DAYN[d.getDay()] + " · " + d.toLocaleDateString("he-IL", {day: "numeric", month: "long"}); };

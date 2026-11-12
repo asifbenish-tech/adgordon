@@ -1,5 +1,5 @@
 // שכבת הנתונים: Firestore, או המכשיר עצמו במצב הדגמה. אותו ממשק לשניהם.
-//   watch(path, cb, opt) -> unsub      opt: {has: [field, value]} | {recent: n}
+//   watch(path, cb, opt) -> unsub      opt: {has: [field, value]} | {eq: [field, value]} | {recent: n}
 //   put(path, id|null, obj, merge)     del(path, id)
 import {SDK, DEMO} from "./config.js";
 import {ls, rid} from "./util.js";
@@ -25,6 +25,7 @@ async function fireStore(fbApp) {
     watch(path, cb, opt) {
       let q = Fs.collection(db, path);
       if (opt.has) q = Fs.query(q, Fs.where(opt.has[0], "array-contains", opt.has[1]));
+      if (opt.eq) q = Fs.query(q, Fs.where(opt.eq[0], "==", opt.eq[1]));
       if (opt.recent) q = Fs.query(q, Fs.orderBy("at", "desc"), Fs.limit(opt.recent));
       return Fs.onSnapshot(q, snap => cb(snap.docs.map(d => Object.assign({id: d.id}, d.data()))), err => cb(null, err));
     },
@@ -41,6 +42,7 @@ function demoStore() {
   const view = w => {
     let list = (db[w.path] || []).slice();
     if (w.opt.has) list = list.filter(x => (x[w.opt.has[0]] || []).includes(w.opt.has[1]));
+    if (w.opt.eq) list = list.filter(x => x[w.opt.eq[0]] === w.opt.eq[1]);
     if (w.opt.recent) list = list.sort((a, b) => b.at - a.at).slice(0, w.opt.recent);
     return list;
   };

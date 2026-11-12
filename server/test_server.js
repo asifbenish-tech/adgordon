@@ -13,7 +13,9 @@ const SA = {project_id: "gordon-staff", client_email: "firebase-adminsdk@gordon-
 
 function makeEnv() {
   const props = {SA_KEY: JSON.stringify(SA)}, cache = {}, mails = [], sheets = {};
-  const fsdb = {}, pushes = [], triggers = [], tokens = {};   // Firestore מדומה: {"col/id": fields}; התראות שנשלחו; אסימוני משתמשים
+  const fsdb = {}, pushes = [], triggers = [], tokens = {}, valid = {};
+  // אסימון זיהוי מדומה: מחזיר JWT ש-lookup מכיר. forge = אותו גוף, אבל Google לא מכירה אותו
+  const mint = (uid, claims) => { const t = "h." + Buffer.from(JSON.stringify(Object.assign({user_id: uid}, claims))).toString("base64url") + ".s" + Object.keys(valid).length; valid[t] = uid; return t; };   // Firestore מדומה: {"col/id": fields}; התראות שנשלחו; אסימוני משתמשים
   let now = Date.parse("2026-10-25T08:00:00Z");
   const toBytes = b => Array.from(b, x => (x > 127 ? x - 256 : x));   // כמו Java: בתים עם סימן
   const sheet = name => ({
@@ -41,7 +43,7 @@ function makeEnv() {
       create() { sheets.Sheet1 = []; return {getSheets: () => [sheet("Sheet1")], insertSheet: n => { sheets[n] = []; return sheet(n); }, getId: () => "SHEET", getUrl: () => "https://sheet"}; },
       openById: () => ({getSheetByName: n => sheet(n), getUrl: () => "https://sheet"}),
     },
-    UrlFetchApp: {fetch(url, opt) {
+    UrlFetchApp: {fetchAll(reqs) { return reqs.map(q => this.fetch(q.url, q)); }, fetch(url, opt) {
       const res = (code, o) => ({getResponseCode: () => code, getContentText: () => JSON.stringify(o)});
       if (url.includes("access_map.json")) return res(200, ACCESS);
       if (url.includes("script.google.com")) return res(200, LIVE);
@@ -51,7 +53,8 @@ function makeEnv() {
         return ok ? res(200, {idToken: "x"}) : res(400, {error: {message: "INVALID_CUSTOM_TOKEN"}});
       }
       if (url.includes("accounts:delete")) return res(200, {});
-      if (url.includes("accounts:lookup")) { const u = tokens[JSON.parse(opt.payload).idToken]; return u ? res(200, {users: [{localId: u.uid, customAttributes: JSON.stringify(u.claims)}]}) : res(400, {error: {message: "INVALID_ID_TOKEN"}}); }
+      // כמו Firebase האמיתי: lookup מחזיר רק את המזהה; השם והתפקיד נמצאים בגוף האסימון עצמו
+      if (url.includes("accounts:lookup")) { const uid = valid[JSON.parse(opt.payload).idToken]; return uid ? res(200, {users: [{localId: uid}]}) : res(400, {error: {message: "INVALID_ID_TOKEN"}}); }
       if (url.includes("oauth2.googleapis.com/token")) {
         const [h, b, sg] = opt.payload.assertion.split(".");
         return crypto.verify("RSA-SHA256", Buffer.from(h + "." + b), publicKey, Buffer.from(sg, "base64url")) ? res(200, {access_token: "AT"}) : res(400, {error: "invalid_grant"});
@@ -64,6 +67,8 @@ function makeEnv() {
           fsdb[pth] = mask.length ? Object.assign({}, fsdb[pth], Object.fromEntries(mask.filter(k => k in f).map(k => [k, f[k]]))) : f;
           return res(200, {});
         }
+        const one = decodeURIComponent(pth);
+        if (one.split("/").length === 2) return fsdb[one] ? res(200, {name: one, fields: fsdb[one]}) : res(404, {error: {status: "NOT_FOUND"}});
         return res(200, {documents: Object.keys(fsdb).filter(k => k.startsWith(pth + "/")).map(k => ({name: "projects/x/databases/(default)/documents/" + k, fields: fsdb[k]}))});
       }
       if (url.includes("fcm.googleapis.com")) { const m = JSON.parse(opt.payload).message; pushes.push(m); return m.token === "dead" ? res(404, {}) : res(200, {}); }
@@ -78,7 +83,8 @@ function makeEnv() {
       base64EncodeWebSafe: x => Buffer.from(typeof x === "string" ? Buffer.from(x, "utf8") : Uint8Array.from(x, v => v & 255)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_"),
       computeRsaSha256Signature: (s, pem) => toBytes(crypto.sign("RSA-SHA256", Buffer.from(s, "utf8"), pem)),
       computeHmacSha256Signature: (s, k) => toBytes(crypto.createHmac("sha256", k).update(s).digest()),
-      newBlob: s => ({getBytes: () => toBytes(Buffer.from(s, "utf8"))}),
+      newBlob: s => ({getBytes: () => toBytes(Buffer.from(s, "utf8")), getDataAsString: () => Buffer.from(Uint8Array.from(s, v => v & 255)).toString("utf8")}),
+      base64DecodeWebSafe: x => toBytes(Buffer.from(x, "base64url")),
       formatDate: (d, tz, fmt) => {   // רק התבנית שהשרת משתמש בה: "u|HH|mm|yyyy-MM-dd"
         const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", year: "numeric", month: "2-digit", day: "2-digit", hourCycle: "h23"}).formatToParts(d).map(x => [x.type, x.value]));
         return [["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(p.weekday) + 1, p.hour, p.minute, p.year + "-" + p.month + "-" + p.day].join("|");
@@ -88,7 +94,7 @@ function makeEnv() {
   vm.createContext(env);
   vm.runInContext(fs.readFileSync(path.join(__dirname, "Code.gs"), "utf8") + "\nOWNER_HASH = " + JSON.stringify(OWNER_H) + ";", env);
   const post = body => JSON.parse(env.doPost({postData: {contents: JSON.stringify(body)}}).text);
-  return {env, post, mails, sheets, props, fsdb, pushes, triggers, tokens, tick: ms => { now += ms; }, setNow: t => { now = Date.parse(t); }, clearCache: () => { for (const k in cache) delete cache[k]; }};
+  return {env, post, mails, sheets, props, fsdb, pushes, triggers, tokens, mint, tick: ms => { now += ms; }, setNow: t => { now = Date.parse(t); }, clearCache: () => { for (const k in cache) delete cache[k]; }};
 }
 
 const T = makeEnv();
@@ -193,13 +199,16 @@ W.sheets["מיילים"].forEach(row => { if (row[0] === "אנה") row[1] = "ann
 const S1 = v => ({stringValue: v}), uid = n => "t_" + Buffer.from(n, "utf8").toString("hex");
 
 // ייבוא: רק הנהלה, עם אסימון תקף
-W.tokens.adminTok = {uid: uid("אסיף"), claims: {n: "אסיף", r: "admin"}};
-W.tokens.teachTok = {uid: uid("אנה"), claims: {n: "אנה", r: "teacher"}};
-assert.match(W.post({a: "import", t: "teachTok"}).error, /הנהלה בלבד/);
+const adminTok = W.mint(uid("אסיף"), {n: "אסיף", r: "admin"}), teachTok = W.mint(uid("אנה"), {n: "אנה", r: "teacher"});
+const forged = "h." + Buffer.from(JSON.stringify({user_id: uid("אסיף"), n: "אסיף", r: "admin"})).toString("base64url") + ".forged";
+const swapped = adminTok.split(".")[0] + "." + teachTok.split(".")[1] + "." + adminTok.split(".")[2];
+assert.match(W.post({a: "import", t: teachTok}).error, /הנהלה בלבד/);
 assert.match(W.post({a: "import", t: "bogus"}).error, /הנהלה בלבד/);
+assert.match(W.post({a: "import", t: forged}).error, /הנהלה בלבד/, "a token Google does not know is refused, whatever it claims");
+assert.match(W.post({a: "import", t: swapped}).error, /הנהלה בלבד/);
 assert.match(W.post({a: "import"}).error, /הנהלה בלבד/);
 assert.strictEqual(Object.keys(W.fsdb).length, 0, "nothing written by refused imports");
-assert.deepStrictEqual(W.post({a: "import", t: "adminTok"}), {ok: true, added: 3, total: 3});
+assert.deepStrictEqual(W.post({a: "import", t: adminTok}), {ok: true, added: 3, total: 3});
 const anna = W.fsdb["staffAuth/" + uid("אנה")];
 assert.deepStrictEqual(anna.h.arrayValue.values, [S1(OTHER_H)]); assert.deepStrictEqual(anna.email, S1("anna@example.com")); assert.deepStrictEqual(anna.role, S1("teacher"));
 assert.deepStrictEqual(W.fsdb["staffAuth/" + uid("לייה")].house, S1("A"));
@@ -208,7 +217,7 @@ assert.ok(!("staffAuth/" + uid("ארז") in W.fsdb), "people removed on the boar
 // ייבוא שני לא דורס מה שנערך בינתיים
 W.fsdb["staffAuth/" + uid("אנה")].email = S1("new@example.com");
 W.fsdb["staff/" + uid("אנה")].groups = {arrayValue: {values: [S1("hA")]}};
-assert.strictEqual(W.post({a: "import", t: "adminTok"}).added, 0);
+assert.strictEqual(W.post({a: "import", t: adminTok}).added, 0);
 assert.deepStrictEqual(W.fsdb["staffAuth/" + uid("אנה")].email, S1("new@example.com"));
 assert.ok(W.fsdb["staff/" + uid("אנה")].groups, "groups survive");
 
@@ -249,10 +258,50 @@ assert.strictEqual(at("2026-11-13T09:30:00+02:00"), 0, "friday: this duty is on 
 assert.strictEqual(at("2026-11-15T11:21:00+02:00"), 1, "sunday duty, 9 minutes before");
 assert.strictEqual(at("2026-11-14T11:21:00+02:00"), 0, "saturday: nothing");
 // התראת בדיקה
-W.tokens.rutiTok = {uid: uid("רותי"), claims: {n: "רותי", r: "teacher"}};
+const rutiTok = W.mint(uid("רותי"), {n: "רותי", r: "teacher"});
 W.pushes.length = 0;
-assert.deepStrictEqual(W.post({a: "pushtest", t: "rutiTok"}), {ok: true, sent: 1});
-assert.match(W.post({a: "pushtest", t: "teachTok"}).error, /לא נשלחה/, "no devices registered");
+assert.deepStrictEqual(W.post({a: "pushtest", t: rutiTok}), {ok: true, sent: 1});
+assert.match(W.post({a: "pushtest", t: teachTok}).error, /לא נשלחה/, "no devices registered");
 assert.match(W.post({a: "pushtest", t: "nope"}).error, /להיכנס מחדש/);
+
+// ---- "הגעת לשמירה?" והתראה לאחראי הביטחון ----
+const L = v => ({arrayValue: {values: v.map(S1)}}), tk = (...t) => ({mapValue: {fields: Object.fromEntries(t.map(x => [x, {integerValue: "1"}]))}});
+W.fsdb["push/" + uid("רותי")].name = S1("רותי כהן");
+W.fsdb["push/" + uid("חסן")] = {tokens: tk("tokHasan"), duty: {arrayValue: {values: []}}};
+W.fsdb["push/" + uid("אסיף")] = {tokens: tk("tokAsif"), duty: {arrayValue: {values: []}}};
+W.fsdb["staff/" + uid("חסן")] = {name: S1("חסן"), groups: L(["sec"])};
+W.fsdb["staff/" + uid("רותי")] = {name: S1("רותי"), full: S1("רותי כהן"), groups: L(["hA"])};
+const tos = () => W.pushes.map(m => m.token + ": " + m.data.title);
+assert.strictEqual(at("2026-11-12T09:42:00+02:00"), 1, "2 minutes into the duty, not checked in: asked 'did you arrive?'");
+assert.deepStrictEqual(tos().filter(x => !x.startsWith("dead")), ["tokA: הגעת לשמירה?"]);
+assert.strictEqual(at("2026-11-12T09:47:00+02:00"), 1, "7 minutes in, still no check-in: the security officer is alerted");
+assert.deepStrictEqual(tos(), ["tokHasan: לא אושרה הגעה לשמירה"]);
+assert.strictEqual(W.pushes[0].data.body, "רותי כהן · חצר מתקנים · 09:40–10:00");
+W.setNow("2026-11-12T09:49:00+02:00"); W.pushes.length = 0; assert.strictEqual(W.env.tick(), 0, "alerted once only");
+assert.strictEqual(at("2026-11-12T09:52:00+02:00"), 0, "after the window nothing more is sent");
+W.fsdb["checkins/2026-11-12_" + uid("רותי") + "_09:40"] = {uid: S1(uid("רותי"))};
+assert.strictEqual(at("2026-11-12T09:42:00+02:00"), 0, "checked in: no question");
+assert.strictEqual(at("2026-11-12T09:47:00+02:00"), 0, "checked in: no alert to security");
+assert.strictEqual(W.pushes.length, 0);
+
+// ---- התראה על הודעה חדשה ----
+W.fsdb["staff/" + uid("אסיף")].groups = L(["mgmt", "hA"]);
+W.fsdb["push/" + uid("אנה")] = {tokens: tk("tokAnna")};
+W.fsdb["staff/" + uid("אנה")].groups = L(["hB"]);
+const note = b => { W.clearCache(); W.pushes.length = 0; const r = W.post(Object.assign({a: "notify"}, b)); return [r, W.pushes.map(m => m.token).sort().join(",")]; };
+let [nr, nt] = note({t: rutiTok, kind: "board", to: ["all"], title: "אסיפה", text: "מחר ב-14:00"});
+assert.strictEqual(nr.ok, true); assert.strictEqual(nt, "tokAnna,tokAsif,tokHasan", "everyone but the sender");
+assert.deepStrictEqual(W.pushes[0].data, {title: "הודעה חדשה: אסיפה", body: "רותי כהן · מחר ב-14:00", url: "#/msg"});
+[nr, nt] = note({t: rutiTok, kind: "board", to: ["hA"], title: "x", text: "y"}); assert.strictEqual(nt, "tokAsif", "only members of the group");
+[nr, nt] = note({t: rutiTok, kind: "board", to: ["mgmt"], title: "x", text: "y"}); assert.strictEqual(nt, "", "the general board cannot reach the management box");
+[nr, nt] = note({t: rutiTok, kind: "mgmt", title: "x", text: "y"}); assert.match(nr.error, /צוות הניהול/); assert.strictEqual(nt, "");
+[nr, nt] = note({t: adminTok, kind: "mgmt", title: "תקציב", text: "y"}); assert.strictEqual(nt, "", "only other mgmt members (none registered)");
+[nr, nt] = note({t: rutiTok, kind: "chat", to: uid("אנה"), text: "היי"}); assert.strictEqual(nt, "tokAnna");
+assert.deepStrictEqual(W.pushes[0].data, {title: "רותי כהן", body: "היי", url: "#/chat/" + uid("רותי")});
+W.fsdb["staff/" + uid("אנה")].off = {booleanValue: true};
+[nr, nt] = note({t: rutiTok, kind: "chat", to: uid("אנה"), text: "היי"}); assert.strictEqual(nt, "", "blocked people get nothing");
+[nr, nt] = note({t: forged, kind: "board", to: ["all"], title: "x", text: "y"}); assert.match(nr.error, /להיכנס מחדש/); assert.strictEqual(nt, "");
+W.clearCache(); for (let i = 0; i < 60; i++) W.post({a: "notify", t: rutiTok, kind: "chat", to: uid("חסן"), text: "x"});
+assert.match(W.post({a: "notify", t: rutiTok, kind: "chat", to: uid("חסן"), text: "x"}).error, /יותר מדי/, "rate limit per sender");
 
 console.log("server/Code.gs: all checks passed");

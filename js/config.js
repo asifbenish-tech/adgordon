@@ -27,5 +27,8 @@ export const DEMO = !AUTH_API || (() => { try { if (new URLSearchParams(location
 // קבוצות ברירת המחדל. ההנהלה מוסיפה ומוחקת קבוצות במסך "ניהול צוות" (נשמר ב-meta/groups).
 export const DEFAULT_GROUPS = [
   {id: "hA", label: "בית א"}, {id: "hB", label: "בית ב"}, {id: "hC", label: "בית ג"},
-  {id: "home", label: "מחנכים"}, {id: "mgmt", label: "צוות ניהול"}
+  {id: "home", label: "מחנכים"}, {id: "mgmt", label: "צוות ניהול"}, {id: "sec", label: "אחראי ביטחון"}
 ];
+// קבוצות שהאפליקציה תלויה בהן: תמיד קיימות, גם אם רשימת הקבוצות נערכה לפני שנוספו.
+// mgmt = תיבת הודעות נפרדת; sec = מקבלים התראה כשאיש צוות לא אישר הגעה לשמירה, ורואים מי אישר.
+export const BUILTIN_GROUPS = ["mgmt", "sec"];

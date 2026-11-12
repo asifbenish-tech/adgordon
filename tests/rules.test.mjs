@@ -66,6 +66,20 @@ await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(), "staff/t_admi
 await t("token says admin but database says teacher: not admin", no(setDoc(doc(A, "meta/x"), {a: 3})));
 await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(), "staff/t_admin"), {name: "t_admin", groups: [], role: "admin"}));
 await t("admin again", ok(setDoc(doc(A, "meta/x"), {a: 4})));
+// אישור הגעה לשמירה
+const ci = u => ({uid: u, name: "x", date: "2026-11-12", from: "09:40", to: "10:00", place: "חצר", at: 1});
+await t("check in for own duty", ok(setDoc(doc(T1, "checkins/2026-11-12_t_one_09:40"), ci("t_one"))));
+await t("cannot check in for someone else", no(setDoc(doc(T2, "checkins/2026-11-12_t_one_11:30"), Object.assign(ci("t_one"), {from: "11:30"}))));
+await t("cannot check in under another's id", no(setDoc(doc(T2, "checkins/2026-11-12_t_one_09:40"), ci("t_two"))));
+await t("check-in id must match its content", no(setDoc(doc(T2, "checkins/whatever"), ci("t_two"))));
+await t("blocked cannot check in", no(setDoc(doc(B, "checkins/2026-11-12_t_blocked_09:40"), ci("t_blocked"))));
+await t("check-in cannot be changed", no(updateDoc(doc(T1, "checkins/2026-11-12_t_one_09:40"), {at: 2})));
+await t("check-in cannot be deleted", no(deleteDoc(doc(T1, "checkins/2026-11-12_t_one_09:40"))));
+await t("reads own check-ins", ok(getDocs(query(collection(T1, "checkins"), where("uid", "==", "t_one")))));
+await t("cannot read others' check-ins", no(getDocs(query(collection(T2, "checkins"), where("date", "==", "2026-11-12")))));
+await t("admin reads today's check-ins", ok(getDocs(query(collection(A, "checkins"), where("date", "==", "2026-11-12")))));
+await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(), "staff/t_sec"), {name: "t_sec", groups: ["sec"]}));
+await t("security officer reads today's check-ins", ok(getDocs(query(collection(db("t_sec", "teacher"), "checkins"), where("date", "==", "2026-11-12")))));
 // תמונות פרופיל
 const jpg = "data:image/jpeg;base64," + "A".repeat(2000);
 await t("own photo", ok(setDoc(doc(T1, "photos/t_one"), {data: jpg, at: 1})));

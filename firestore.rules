@@ -52,6 +52,14 @@ service cloud.firestore {
       allow read, create, update: if staff() && uid == request.auth.uid;
       allow delete: if staff() && (uid == request.auth.uid || admin());
     }
+    // אישור הגעה לשמירה: כל אחד מאשר רק לעצמו (ואי אפשר לשנות או למחוק). רואים: הוא עצמו, ההנהלה ואחראי הביטחון (sec).
+    match /checkins/{id} {
+      allow read: if staff() && (resource.data.uid == request.auth.uid || admin() || inGroup('sec'));
+      allow create: if staff() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'date', 'from', 'to', 'place', 'at'])
+        && request.resource.data.date is string && request.resource.data.from is string
+        && id == request.resource.data.date + '_' + request.auth.uid + '_' + request.resource.data.from;
+    }
     match /meta/{id}   { allow read: if staff(); allow write: if admin(); }
     match /duties/{id} { allow read: if staff(); allow write: if admin(); }
     match /events/{id} { allow read: if staff(); allow write: if admin(); }

@@ -2,18 +2,22 @@
 // המבנה ב-Firestore מתועד ב-INTEGRATION.md, וההרשאות ב-firestore.rules.
 import {S, changed} from "./state.js";
 import {watch, watchDoc, put, del} from "./store.js";
-import {DEFAULT_GROUPS, TT_URL, EVENTS_URL} from "./config.js";
+import {DEFAULT_GROUPS, BUILTIN_GROUPS, TT_URL, EVENTS_URL, DEMO} from "./config.js";
+import {api, idToken} from "./auth.js";
 import {ls, today, uidOf, nameOf, rid, heSort, norm, iso, DAYN} from "./util.js";
 
 const HOUSE = {A: "hA", B: "hB", C: "hC"};
 export const MGMT = "mgmt";   // קבוצת צוות הניהול: יש לה תיבת הודעות נפרדת
-let authWatch = null, started = false, chans = new Map(), byChan = {}, chatUnsub = null, chatCid = null, registered = false;
+let authWatch = null, checkWatch = "", started = false, chans = new Map(), byChan = {}, chatUnsub = null, chatCid = null, registered = false;
 
 // התפקיד: מה שמוגדר במאגר הצוות; עד שמוגדר - מה שהשרת חתם בכניסה
 export const roleOf = () => { const d = (S.staff || []).find(x => x.id === S.user.uid); return (d && d.role) || S.user.role; };
 export const isAdmin = () => !!S.user && roleOf() === "admin";
 export const fullName = n => (S.T && S.T.full && S.T.full[n]) || n;
-export const groups = () => (S.groupsDoc && Array.isArray(S.groupsDoc.list) ? S.groupsDoc.list : DEFAULT_GROUPS);
+export const groups = () => {
+  if (!(S.groupsDoc && Array.isArray(S.groupsDoc.list))) return DEFAULT_GROUPS;
+  return [...S.groupsDoc.list, ...DEFAULT_GROUPS.filter(g => BUILTIN_GROUPS.includes(g.id) && !S.groupsDoc.list.some(x => x.id === g.id))];
+};
 export const groupLabel = id => id === "all" ? "כל הצוות" : (groups().find(g => g.id === id) || {}).label || "";
 export const myGroups = () => { const d = (S.staff || []).find(x => x.id === S.user.uid); return d ? (d.groups || []).filter(groupLabel) : []; };
 const byWhen = (a, b) => (a.date + (a.from || a.time || "")).localeCompare(b.date + (b.from || b.time || ""));
@@ -77,6 +81,27 @@ export function nextDuty() {
   const date = new Date(now); date.setDate(date.getDate() + best.d);
   return {slot: best.slot, date: iso(date), when: best.d === 0 ? "היום" : best.d === 1 ? "מחר" : "יום " + DAYN[best.slot.day]};
 }
+// ---- אישור הגעה לשמירה: checkins/<תאריך>_<uid>_<שעת התחלה> ----
+// השרת (tick) בודק 5-10 דקות אחרי תחילת השמירה; בלי אישור - התראה לאחראי הביטחון (קבוצת sec).
+export const SEC = "sec";
+export const seesCheckins = () => isAdmin() || (!!S.staff && myGroups().includes(SEC));
+const hm = () => { const d = new Date(); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+const addMin = (t, n) => { const [h, m] = t.split(":").map(Number), x = h * 60 + m + n; return String(Math.floor(x / 60)).padStart(2, "0") + ":" + String(x % 60).padStart(2, "0"); };
+export const checkId = (uid, from) => today() + "_" + uid + "_" + from;
+export const checkedIn = (uid, from) => (S.checkins || []).find(c => c.id === checkId(uid, from)) || null;
+// השמירה שלי שמתרחשת עכשיו (מ-10 דקות לפני ועד הסוף): {slot, done: האישור אם כבר ניתן}
+export function dutyNow() {
+  const now = hm(), day = new Date().getDay(), x = myDuty().find(s => s.day === day && addMin(s.from, -10) <= now && now <= s.to);
+  return x ? {slot: x, done: checkedIn(S.user.uid, x.from), started: now >= x.from} : null;
+}
+export const checkIn = slot => put("checkins", checkId(S.user.uid, slot.from), {uid: S.user.uid, name: myFull(), date: today(), from: slot.from, to: slot.to, place: slot.places.join(" + "), at: Date.now()});
+// מי שרואה את כולם מאזין לאישורים של היום; כל השאר - רק לשלהם
+function syncCheckins() {
+  const mode = seesCheckins() ? "all" : "mine";
+  if (checkWatch === mode) return; checkWatch = mode;
+  watch("checkins", list => { if (checkWatch === mode) { S.checkins = (list || []).filter(c => c.date === today()); changed(); } }, mode === "all" ? {eq: ["date", today()]} : {eq: ["uid", S.user.uid]});
+}
+
 export const dutyUnmatched = () => [...new Set(dutySlots().filter(x => !x.p).map(x => x.raw))].sort(heSort);
 // ההנהלה קובעת ששם מהגיליון הוא איש צוות מסוים: נשמר ככינוי אצלו (ומוסר מאחרים)
 export async function setAlias(raw, uid) {
@@ -113,6 +138,7 @@ function after(key) {
     if (key === "staff" && !registered && !S.err && !S.staff.some(x => x.id === S.user.uid)) { registered = true; put("staff", S.user.uid, {name: S.user.name, groups: []}).catch(() => {}); }
     syncChannels();
     // פרטי הכניסה (ת"ז מגובבת, מייל) נקראים רק אצל הנהלה - הכללים חוסמים את כל השאר
+    syncCheckins();
     if (isAdmin() && !authWatch) authWatch = watch("staffAuth", list => { if (!list) return; S.auth = {}; for (const x of list) S.auth[x.id] = x; changed(); });
   }
   changed();
@@ -138,7 +164,10 @@ function merge() {
 export async function sendBoard(title, body, to) {
   const mid = rid(), doc = {mid, title, body, to, by: S.user.uid, byName: myFull(), at: Date.now()};
   await Promise.all(chansOf(doc).map(ch => put("channels/" + ch + "/msgs", mid, doc)));
+  notify(to.includes(MGMT) ? {kind: "mgmt", title, text: body} : {kind: "board", to, title, text: body});
 }
+// מבקש משרת הכניסה לשלוח התראת דחיפה לנמענים. לא מעכב ולא מכשיל את השליחה עצמה.
+function notify(msg) { if (!DEMO) idToken().then(t => api(Object.assign({a: "notify", t}, msg))).catch(() => {}); }
 // הערוצים שבהם יושבת הודעה: קהלי היעד + העותק של השולח. הודעת צוות ניהול יושבת רק בערוץ שלו.
 const chansOf = m => (m.to || []).includes(MGMT) ? [MGMT] : [...(m.to || []), "s_" + m.by];
 export const delBoard = m => Promise.all(chansOf(m).map(ch => del("channels/" + ch + "/msgs", m.mid || m.id)));
@@ -171,6 +200,7 @@ export async function sendChat(other, text) {
   const me = S.user.uid, cid = cidOf(other), at = Date.now();
   await put("chats", cid, {members: [me, other].sort(), names: {[me]: S.user.name, [other]: person(other).name}, last: {text: text.slice(0, 80), at, by: me}}, true);
   await put("chats/" + cid + "/msgs", null, {by: me, text, at});
+  notify({kind: "chat", to: other, text});
 }
 
 // ---- לוח אירועים והערכות: נקרא חי מהגיליון (gviz), עם עותק אחרון במכשיר למקרה שאין רשת ----

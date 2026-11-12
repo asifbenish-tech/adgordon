@@ -20,7 +20,8 @@ Firestore של פרויקט `gordon-staff`. קוראים ממנו רק אנשי 
 | `events` | `{date, time?, title, place?, note?}` | הנהלה מהאפליקציה |
 | `staff/<uid>` | `{name, full?, phone?, role?, groups:[מזהי קבוצות], aliases?:[...], off?, removed?}` - **אובייקט אנשי הצוות המשותף**. לדלג על `removed`. | מסך ניהול הצוות |
 | `staffAuth/<uid>` | `{name, h:[גיבובי ת"ז], email, role, house?}` - פרטי הכניסה. הנהלה ושרתים בלבד. | מסך ניהול הצוות |
-| `push/<uid>` | `{tokens:{אסימון FCM: זמן}, duty:[{day, from, to, place}]}` | המכשיר של המשתמש |
+| `push/<uid>` | `{name, duty:[{day, from, to, place}], tokens?:{אסימון FCM: זמן}}` | המכשיר של המשתמש |
+| `checkins/<תאריך>_<uid>_<שעה>` | `{uid, name, date, from, to, place, at}` - אישור הגעה לשמירה | האדם עצמו |
 | `photos/<uid>` | `{data: JPEG קטן כ-data URL, at}` | כל איש צוות, את שלו |
 | `meta/groups` | `{list:[{id, label}]}` | מסך ניהול הצוות |
 | `channels/<ערוץ>/msgs/<mid>` | `{mid, title, body, to:[...], by:<uid>, byName, at:<ms>}` | כל איש צוות |

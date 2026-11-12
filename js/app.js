@@ -60,4 +60,5 @@ window.addEventListener("hashchange", () => render(true));
 onChange(() => { render(false); syncPush().catch(() => {}); });
 render(true);
 initAuth();
+setInterval(() => { if (S.user && !document.hidden) render(false); }, 60000);   // כרטיס "הגעתי לשמירה" מופיע ונעלם לפי השעה
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
