@@ -17,6 +17,9 @@ export const PORTAL_URL = "https://asifbenish-tech.github.io/gordon-staff/";
 export const EVENTS_SHEET = "1nSX51Fcz_fRJHfioBOMWF7WGZGgtXcsqoobJMXZlzmo";
 export const EVENTS_URL = "https://docs.google.com/spreadsheets/d/" + EVENTS_SHEET + "/gviz/tq?tqx=out:json&headers=0";
 export const EVENTS_VIEW = "https://docs.google.com/spreadsheets/d/" + EVENTS_SHEET + "/edit";
+// התראות דחיפה: המפתח הציבורי (VAPID) מ-Firebase console -> Project settings -> Cloud Messaging -> Web Push certificates.
+// ריק = אין התראות דחיפה (האפליקציה מציעה רק את יומן הטלפון).
+export const PUSH_KEY = "";
 export const ID_SALT = "gordon-lohot-2026";   // אותו מלח כמו בלוח המערכות
 // מצב הדגמה: בלי שרת ובלי Firebase, נתוני דוגמה שנשמרים רק במכשיר.
 // פעיל כל עוד אין שרת כניסה, או עם ?demo=1 בכתובת.

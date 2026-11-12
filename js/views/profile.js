@@ -4,6 +4,7 @@ import {S} from "../state.js";
 import {$, esc} from "../util.js";
 import {myFull, myGroups, savePhoto, delPhoto} from "../data.js";
 import {tags, avatar, ui, tryDo} from "../ui.js";
+import {pushCard, bindPush} from "../push.js";
 
 const OUT = 192, VIEW = 600;   // גודל התמונה הנשמרת; רזולוציית משטח העריכה
 let ed = null;                 // {img, s, min, x, y, rot} בזמן עריכה
@@ -43,11 +44,12 @@ export default {
     return '<div class="card prof"><div class="big">' + avatar(S.user) + "</div><b>" + esc(myFull()) + '</b><div class="tags">' + tags(g) + "</div></div>" +
       '<label class="btn filebtn"><i class="fa-solid fa-camera"></i> ' + (has ? "החלפת התמונה" : "הוספת תמונה") + '<input id="pfile" type="file" accept="image/*"></label>' +
       (has ? '<button type="button" class="btn ghost" id="pdel"><i class="fa-solid fa-trash-can"></i> הסרת התמונה</button>' : "") +
-      '<p class="hint center">התמונה תופיע ליד השם שלך בהודעות, בשיחות וברשימת הצוות. רואים אותה רק אנשי הצוות.</p>';
+      '<p class="hint center">התמונה תופיע ליד השם שלך בהודעות, בשיחות וברשימת הצוות. רואים אותה רק אנשי הצוות.</p>' + pushCard();
   },
   bind() {
     if (!ed) {
       $("pfile").onchange = e => load(e.target.files[0]);
+      bindPush(() => ui.render());
       const d = $("pdel"); if (d) d.onclick = async () => { if (confirm("להסיר את התמונה?") && await tryDo(delPhoto)) ui.render(); };
       return;
     }

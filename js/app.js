@@ -4,7 +4,8 @@ import {DEMO} from "./config.js";
 import {$, esc} from "./util.js";
 import {ui, avatar} from "./ui.js";
 import {initAuth, loginHtml, bindLogin} from "./auth.js";
-import {unreadBoard, unreadChats} from "./data.js";
+import {unreadBoard, unreadChats, unreadMgmt} from "./data.js";
+import {syncPush} from "./push.js";
 import home, {dateLine} from "./views/home.js";
 import tt from "./views/tt.js";
 import duty from "./views/duty.js";
@@ -45,7 +46,7 @@ function render(force) {
 }
 
 function badge() {
-  const em = document.querySelector('#tabs a[data-t="msg"] em'), n = unreadBoard() + unreadChats();
+  const em = document.querySelector('#tabs a[data-t="msg"] em'), n = unreadBoard() + unreadChats() + unreadMgmt();
   em.hidden = !n; em.textContent = n || "";
 }
 
@@ -53,7 +54,7 @@ $("tabs").innerHTML = TABS.map(t => '<a href="#/' + t[0] + '" data-t="' + t[0] +
 $("back").onclick = () => go(VIEWS[route().name].parent || "home");
 ui.render = () => render(true);
 window.addEventListener("hashchange", () => render(true));
-onChange(() => render(false));
+onChange(() => { render(false); syncPush().catch(() => {}); });
 render(true);
 initAuth();
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});

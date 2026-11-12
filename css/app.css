@@ -267,3 +267,18 @@ body.hero .mebtn .av{width:48px;height:48px;font-size:1.2rem}
 .todaybox h3{font-size:1rem;font-weight:800;color:var(--ink)}
 .todaybox h3 i{color:var(--brand-ink);margin-inline-end:4px}
 .todaybox .day{box-shadow:none;border-color:transparent;background:color-mix(in srgb,var(--surface) 70%,transparent)}
+
+/* כרטיסי הסבר (התראות, כניסה) */
+.card.note{display:grid;gap:8px}
+.card.note b{color:var(--ink);font-size:.98rem}
+.card.note b i{color:var(--brand-ink);margin-inline-end:4px}
+.card.note p{font-size:.88rem;color:var(--muted)}
+.card.note.ok2{border-color:color-mix(in srgb,var(--green) 40%,var(--line))}
+.card.note.ok2 b i{color:var(--green)}
+.card.note.warn{border-color:color-mix(in srgb,var(--warn) 50%,var(--line));background:color-mix(in srgb,var(--warn-soft) 50%,var(--surface))}
+.pform h4{margin:6px 0 0;font-size:.9rem;font-weight:800;color:var(--ink)}
+.pform .state{font-size:.84rem;color:var(--muted)}
+.pform .state.bad{color:var(--red)}
+.btn.danger{background:transparent;color:var(--red);border:1px solid color-mix(in srgb,var(--red) 40%,var(--line))}
+.call{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:var(--green);background:color-mix(in srgb,var(--green) 13%,transparent);cursor:pointer}
+.hint i{margin-inline-end:4px}
