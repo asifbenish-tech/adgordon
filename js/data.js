@@ -200,16 +200,17 @@ export function loadSheet() {
     S.sheet = d; ls("adgSheet", d); changed();
   }).catch(() => { S.sheet = S.sheet ? Object.assign(S.sheet, {err: true}) : {days: [], classes: [], err: true}; changed(); });
 }
-// הימים הקרובים שיש בהם משהו: הגיליון + אירועים שנוספו ידנית באפליקציה
-export function calDays() {
+// כל הימים שיש בהם משהו: הגיליון + אירועים שנוספו ידנית באפליקציה
+export function allDays() {
   const m = new Map();
-  for (const d of (S.sheet && S.sheet.days) || []) if (d.date >= today()) m.set(d.date, {date: d.date, acts: d.acts.slice(), note: d.note, tests: d.tests});
-  for (const e of S.events || []) if (e.date >= today()) {
+  for (const d of (S.sheet && S.sheet.days) || []) m.set(d.date, {date: d.date, acts: d.acts.slice(), note: d.note, tests: d.tests});
+  for (const e of S.events || []) {
     if (!m.has(e.date)) m.set(e.date, {date: e.date, acts: [], note: "", tests: []});
     m.get(e.date).acts.push({t: e.title + (e.time ? " · " + e.time : "") + (e.place ? " · " + e.place : "") + (e.note ? " · " + e.note : ""), k: kindOf(e.title), id: e.id});
   }
   return [...m.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
+export const calDays = () => allDays().filter(d => d.date >= today());   // מהיום והלאה
 
 // ---- עדכון הפרטים של עצמי: שם מלא וטלפון ב-staff, מייל ב-staffAuth. אותם מסמכים שאפליקציית ניהול הצוות עורכת. ----
 export async function saveMine(full, phone, email) {

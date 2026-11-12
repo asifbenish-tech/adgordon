@@ -1,5 +1,5 @@
 // גרסה: להעלות את המספר בכל עדכון, כדי שהטלפונים יקבלו את הגרסה החדשה.
-const CACHE = 'adgordon-v9';
+const CACHE = 'adgordon-v10';
 const CORE = ['./', './index.html', './css/app.css', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './favicon.png', './logo.png', './logo-mark.png',
   './vendor/fa/css/fontawesome.min.css', './vendor/fa/css/solid.min.css', './vendor/fa/webfonts/fa-solid-900.woff2',
   './data/duty.json', './js/app.js', './js/config.js', './js/util.js', './js/state.js', './js/store.js', './js/demo.js', './js/data.js', './js/auth.js', './js/ui.js',
