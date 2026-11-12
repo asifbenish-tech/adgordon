@@ -110,7 +110,7 @@ body.in .mebtn{display:block}
 .mebtn .av{width:40px;height:40px;font-size:1rem;box-shadow:0 0 0 2px rgba(255,255,255,.55)}
 body.hero .logo{width:54px;height:54px;border-radius:16px;padding:4px}
 body.hero .mebtn .av{width:48px;height:48px;font-size:1.2rem}
-.biglogo{width:150px;margin:0 auto}
+.biglogo{width:190px;margin:0 auto}
 .biglogo img{width:100%;height:auto;display:block;border-radius:16px;background:#fff}
 /* פרופיל ועריכת תמונה */
 .prof{display:grid;justify-items:center;gap:8px;padding:24px 16px;text-align:center}

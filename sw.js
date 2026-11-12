@@ -1,6 +1,6 @@
 // גרסה: להעלות את המספר בכל עדכון, כדי שהטלפונים יקבלו את הגרסה החדשה.
-const CACHE = 'adgordon-v7';
-const CORE = ['./', './index.html', './css/app.css', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './favicon.png',
+const CACHE = 'adgordon-v8';
+const CORE = ['./', './index.html', './css/app.css', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './favicon.png', './logo.png', './logo-mark.png',
   './vendor/fa/css/fontawesome.min.css', './vendor/fa/css/solid.min.css', './vendor/fa/webfonts/fa-solid-900.woff2',
   './data/duty.json', './js/app.js', './js/config.js', './js/util.js', './js/state.js', './js/store.js', './js/demo.js', './js/data.js', './js/auth.js', './js/ui.js',
   './js/views/home.js', './js/views/tt.js', './js/views/duty.js', './js/views/cal.js', './js/views/msg.js', './js/views/staff.js', './js/views/profile.js', './js/push.js'];
