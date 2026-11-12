@@ -9,7 +9,9 @@ export const S = {
   duty: null,            // לוח תורנות השמירה השבועי (data/duty.json)
   events: null,          // אירועים שההנהלה הוסיפה ידנית באפליקציה
   sheet: null,           // לוח האירועים וההערכות מהגיליון: {days: [{date, acts, note, tests}], classes, err?}
+  auth: null,            // הנהלה בלבד: {uid: {h: [גיבובי ת"ז], email, role, house}} - פרטי הכניסה
   photos: null,          // {uid: "data:image/jpeg;base64,..."} - תמונות הפרופיל
+  mgmt: null,            // הודעות צוות הניהול (תיבה נפרדת, רק לחברי הקבוצה)
   board: null,           // הודעות לוח, ממוזגות מכל הערוצים שלי
   chats: null,           // השיחות הפרטיות שלי
   chatWith: null, chatMsgs: null,   // השיחה הפתוחה
@@ -18,3 +20,4 @@ export const S = {
 const subs = new Set();
 export const onChange = f => subs.add(f);
 export const changed = () => subs.forEach(f => f());
+ 

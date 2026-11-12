@@ -6,9 +6,12 @@ import {DEFAULT_GROUPS, TT_URL, EVENTS_URL} from "./config.js";
 import {ls, today, uidOf, nameOf, rid, heSort, norm, iso, DAYN} from "./util.js";
 
 const HOUSE = {A: "hA", B: "hB", C: "hC"};
-let started = false, chans = new Map(), byChan = {}, chatUnsub = null, chatCid = null, registered = false;
+export const MGMT = "mgmt";   // קבוצת צוות הניהול: יש לה תיבת הודעות נפרדת
+let authWatch = null, started = false, chans = new Map(), byChan = {}, chatUnsub = null, chatCid = null, registered = false;
 
-export const isAdmin = () => !!S.user && S.user.role === "admin";
+// התפקיד: מה שמוגדר במאגר הצוות; עד שמוגדר - מה שהשרת חתם בכניסה
+export const roleOf = () => { const d = (S.staff || []).find(x => x.id === S.user.uid); return (d && d.role) || S.user.role; };
+export const isAdmin = () => !!S.user && roleOf() === "admin";
 export const fullName = n => (S.T && S.T.full && S.T.full[n]) || n;
 export const groups = () => (S.groupsDoc && Array.isArray(S.groupsDoc.list) ? S.groupsDoc.list : DEFAULT_GROUPS);
 export const groupLabel = id => id === "all" ? "כל הצוות" : (groups().find(g => g.id === id) || {}).label || "";
@@ -20,8 +23,8 @@ export const upcoming = col => (S[col] || []).filter(x => x.date >= today()).sor
 export function people() {
   const m = new Map();
   for (const n of Object.keys((S.T && S.T.teachers) || {})) m.set(uidOf(n), {uid: uidOf(n), name: n, groups: [], off: false, doc: false});
-  for (const d of S.staff || []) m.set(d.id, {uid: d.id, name: d.name || nameOf(d.id), groups: (d.groups || []).filter(groupLabel), off: !!d.off, doc: true, fullSet: d.full || "", aliases: d.aliases || []});
-  return [...m.values()].map(p => Object.assign({aliases: [], fullSet: ""}, p, {full: p.fullSet || fullName(p.name)})).sort((a, b) => heSort(a.full, b.full));
+  for (const d of S.staff || []) if (d.removed) m.delete(d.id); else m.set(d.id, {uid: d.id, name: d.name || nameOf(d.id), groups: (d.groups || []).filter(groupLabel), off: !!d.off, doc: true, fullSet: d.full || "", aliases: d.aliases || [], role: d.role || "", phone: d.phone || ""});
+  return [...m.values()].map(p => Object.assign({aliases: [], fullSet: "", role: "", phone: ""}, p, {full: p.fullSet || fullName(p.name)})).sort((a, b) => heSort(a.full, b.full));
 }
 export const myFull = () => person(S.user.uid).full;
 
@@ -108,13 +111,17 @@ function after(key) {
     // כניסה ראשונה: נרשמים למאגר הצוות (בלי קבוצות - אותן קובעת ההנהלה)
     if (key === "staff" && !registered && !S.err && !S.staff.some(x => x.id === S.user.uid)) { registered = true; put("staff", S.user.uid, {name: S.user.name, groups: []}).catch(() => {}); }
     syncChannels();
+    // פרטי הכניסה (ת"ז מגובבת, מייל) נקראים רק אצל הנהלה - הכללים חוסמים את כל השאר
+    if (isAdmin() && !authWatch) authWatch = watch("staffAuth", list => { if (!list) return; S.auth = {}; for (const x of list) S.auth[x.id] = x; changed(); });
   }
   changed();
 }
 
 // ---- לוח ההודעות: ערוץ לכל קהל יעד. channels/<all | מזהה קבוצה | s_<uid> (הנשלחות שלי)>/msgs/<mid> ----
 function syncChannels() {
-  const want = new Set(["all", "s_" + S.user.uid, ...(isAdmin() ? groups().map(g => g.id) : S.staff ? myGroups() : [])]);
+  // ההנהלה רואה את כל ערוצי הקבוצות, חוץ מתיבת צוות הניהול - היא פתוחה רק למי שחבר בקבוצה
+  const mine = S.staff ? myGroups() : [];
+  const want = new Set(["all", "s_" + S.user.uid, ...mine, ...(isAdmin() ? groups().map(g => g.id).filter(id => id !== MGMT) : [])]);
   for (const [ch, un] of chans) if (!want.has(ch)) { un(); chans.delete(ch); delete byChan[ch]; }
   for (const ch of want) if (!chans.has(ch)) chans.set(ch, watch("channels/" + ch + "/msgs", list => { byChan[ch] = list || []; merge(); }, {recent: 100}));
   merge();
@@ -123,14 +130,19 @@ function merge() {
   if (!byChan.all) return;   // עד שהערוץ הכללי נטען - "טוען"
   const m = new Map();
   for (const list of Object.values(byChan)) for (const x of list) m.set(x.mid || x.id, x);
-  S.board = [...m.values()].sort((a, b) => b.at - a.at);
+  const all = [...m.values()].sort((a, b) => b.at - a.at), isM = x => (x.to || []).includes(MGMT);
+  S.board = all.filter(x => !isM(x)); S.mgmt = all.filter(isM);
   changed();
 }
 export async function sendBoard(title, body, to) {
   const mid = rid(), doc = {mid, title, body, to, by: S.user.uid, byName: myFull(), at: Date.now()};
-  await Promise.all([...to, "s_" + S.user.uid].map(ch => put("channels/" + ch + "/msgs", mid, doc)));
+  await Promise.all(chansOf(doc).map(ch => put("channels/" + ch + "/msgs", mid, doc)));
 }
-export const delBoard = m => Promise.all([...(m.to || []), "s_" + m.by].map(ch => del("channels/" + ch + "/msgs", m.mid || m.id)));
+// הערוצים שבהם יושבת הודעה: קהלי היעד + העותק של השולח. הודעת צוות ניהול יושבת רק בערוץ שלו.
+const chansOf = m => (m.to || []).includes(MGMT) ? [MGMT] : [...(m.to || []), "s_" + m.by];
+export const delBoard = m => Promise.all(chansOf(m).map(ch => del("channels/" + ch + "/msgs", m.mid || m.id)));
+export const isMgmt = () => !!S.staff && myGroups().includes(MGMT);
+export const unreadMgmt = () => { const seen = ls("adgSeenM") || 0; return isMgmt() ? (S.mgmt || []).filter(m => m.at > seen && m.by !== S.user.uid).length : 0; };
 export const unreadBoard = () => { const seen = ls("adgSeen") || 0; return (S.board || []).filter(m => m.at > seen && m.by !== S.user.uid).length; };
 
 // ---- שיחות פרטיות: chats/<uidA__uidB> + chats/<cid>/msgs ----
@@ -204,6 +216,14 @@ export const delPhoto = () => del("photos", S.user.uid);
 
 // ---- ניהול צוות (הנהלה) ----
 export const saveStaff = (p, patch) => put("staff", p.uid, Object.assign({name: p.name}, patch), true);
+// פרטי כניסה של איש צוות: patch = {email?, role?, h?: [גיבובים]}. התפקיד נשמר גם ב-staff (שם כולם רואים אותו).
+export async function saveAuth(p, patch) {
+  const cur = (S.auth && S.auth[p.uid]) || {};
+  await put("staffAuth", p.uid, Object.assign({name: p.name, h: cur.h || [], email: cur.email || "", role: cur.role || p.role || "teacher"}, patch), true);
+  if (patch.role) await saveStaff(p, {role: patch.role});
+}
+// הסרה מהצוות: המסמך נשאר כ"מצבה" חסומה (off + removed), כדי שמכשיר שעדיין מחובר ייחסם מיד ולא יירשם מחדש
+export const removePerson = p => Promise.all([put("staff", p.uid, {name: p.name, groups: [], off: true, removed: true}), del("staffAuth", p.uid), del("photos", p.uid), del("push", p.uid)]);
 export const saveGroups = list => put("meta", "groups", {list});
 // הצעה ממערכת השעות: מחנכים -> "מחנכים" + הבית של הכיתה. רק מוסיף, לא מסיר.
 export function suggestGroups() {

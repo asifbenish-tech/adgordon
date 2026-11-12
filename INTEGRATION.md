@@ -18,13 +18,20 @@ Firestore של פרויקט `gordon-staff`. קוראים ממנו רק אנשי 
 | אוסף | רשומה | מי כותב היום |
 |---|---|---|
 | `events` | `{date, time?, title, place?, note?}` | הנהלה מהאפליקציה |
-| `staff/<uid>` | `{name, full?, groups:[מזהי קבוצות], aliases?:[...], off?}` - **אובייקט אנשי הצוות המשותף** | מסך ניהול הצוות |
+| `staff/<uid>` | `{name, full?, phone?, role?, groups:[מזהי קבוצות], aliases?:[...], off?, removed?}` - **אובייקט אנשי הצוות המשותף**. לדלג על `removed`. | מסך ניהול הצוות |
+| `staffAuth/<uid>` | `{name, h:[גיבובי ת"ז], email, role, house?}` - פרטי הכניסה. הנהלה ושרתים בלבד. | מסך ניהול הצוות |
+| `push/<uid>` | `{tokens:{אסימון FCM: זמן}, duty:[{day, from, to, place}]}` | המכשיר של המשתמש |
 | `photos/<uid>` | `{data: JPEG קטן כ-data URL, at}` | כל איש צוות, את שלו |
 | `meta/groups` | `{list:[{id, label}]}` | מסך ניהול הצוות |
 | `channels/<ערוץ>/msgs/<mid>` | `{mid, title, body, to:[...], by:<uid>, byName, at:<ms>}` | כל איש צוות |
 | `chats/<uidA__uidB>` + `msgs` | שיחות פרטיות | שני המשתתפים בלבד |
 
 אוסף חדש = שורה בטבלה + כלל ב-`firestore.rules` (ובדיקה ב-`tests/rules.test.mjs`) + מסך ב-`js/views`.
+
+## זיהוי משתמשים באפליקציה אחרת
+
+אפליקציה אחרת שרוצה כניסה בת"ז משתמשת **באותו שרת כניסה** (`server/Code.gs`, פעולות `code` ו-`verify`) ובאותו פרויקט Firebase:
+מקבלים אסימון, נכנסים עם `signInWithCustomToken`, וקוראים את `staff/<uid>` לקבלת שם, תפקיד וקבוצות. לא מקימים רשימת ת"ז נוספת.
 
 ## כללים לשתי הדרכים
 

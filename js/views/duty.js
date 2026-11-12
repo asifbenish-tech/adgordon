@@ -4,6 +4,7 @@ import {S} from "../state.js";
 import {$, esc, DAYN} from "../util.js";
 import {isAdmin, dutySlots, myDuty, dutyUnmatched} from "../data.js";
 import {loading, empty, ui} from "../ui.js";
+import {pushCard, bindPush} from "../push.js";
 
 let all = false, day = null;
 const t = s => s.replace(/^0/, "");
@@ -12,7 +13,7 @@ const span = x => t(x.from) + "–" + t(x.to);
 function mineHtml() {
   const mine = myDuty(), td = new Date().getDay();
   if (!mine.length) return empty("אין לך תורנות שמירה בלוח", "אם זו טעות, כדאי לבדוק איך השם שלך כתוב בלוח המלא.");
-  return '<div class="list">' + mine.map(x => '<div class="item duty' + (x.day === td ? " mine" : "") + '"><div class="date"><small>יום</small><b>' + "אבגדהוש".charAt(x.day) + "׳</b></div><div><b>יום " + DAYN[x.day] + " · " + span(x) +
+  return pushCard() + '<div class="list">' + mine.map(x => '<div class="item duty' + (x.day === td ? " mine" : "") + '"><div class="date"><small>יום</small><b>' + "אבגדהוש".charAt(x.day) + "׳</b></div><div><b>יום " + DAYN[x.day] + " · " + span(x) +
     "</b><span>" + esc(x.places.join(" + ")) + "</span></div>" + (x.day === td ? '<span class="tag g-all">היום</span>' : "") + "</div>").join("") + "</div>" +
     '<button type="button" class="btn ghost" id="ics"><i class="fa-solid fa-calendar-plus"></i> הוספה ליומן הטלפון, עם תזכורת</button>' +
     '<p class="hint">היומן יזכיר לך 10 דקות לפני כל שמירה, כל שבוע עד סוף השנה. אם הלוח משתנה, מוחקים מהיומן ומוסיפים שוב.</p>';
@@ -48,6 +49,7 @@ export default {
     for (const b of el.querySelectorAll("[data-all]")) b.onclick = () => { all = b.dataset.all === "1"; ui.render(); };
     for (const b of el.querySelectorAll("[data-d]")) b.onclick = () => { day = +b.dataset.d; ui.render(); };
     const ics = $("ics"); if (ics) ics.onclick = exportIcs;
+    bindPush(() => ui.render());
   }
 };
 

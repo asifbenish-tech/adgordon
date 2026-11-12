@@ -8,7 +8,9 @@ service cloud.firestore {
     function signed() { return request.auth != null && request.auth.token.n is string; }
     // חסימה ע"י ההנהלה (off) נכנסת לתוקף מיד, גם במכשיר שכבר מחובר
     function staff() { return signed() && !(exists(me()) && get(me()).data.get('off', false) == true); }
-    function admin() { return staff() && request.auth.token.r == 'admin'; }
+    // התפקיד: מה שההנהלה הגדירה במאגר הצוות (שינוי נכנס לתוקף מיד); עד שהוגדר - מה שהשרת חתם בכניסה
+    function role() { return exists(me()) ? get(me()).data.get('role', request.auth.token.get('r', '')) : request.auth.token.get('r', ''); }
+    function admin() { return staff() && role() == 'admin'; }
     function inGroup(g) { return exists(me()) && g in get(me()).data.get('groups', []); }
 
     // מאגר הצוות: כולם קוראים. כל אחד נרשם בעצמו בכניסה הראשונה, בלי קבוצות.
@@ -31,17 +33,26 @@ service cloud.firestore {
         && request.resource.data.data.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$');
       allow delete: if staff() && (uid == request.auth.uid || admin());
     }
+    // פרטי הכניסה (גיבובי ת"ז, מייל, תפקיד): הנהלה בלבד. שרת הכניסה קורא אותם עם חשבון השירות.
+    match /staffAuth/{uid} { allow read, write: if admin(); }
+    // רישום להתראות: כל אחד רואה ומעדכן רק את שלו (אסימוני המכשירים + השמירות שלו). ההנהלה יכולה למחוק.
+    match /push/{uid} {
+      allow read, create, update: if staff() && uid == request.auth.uid;
+      allow delete: if staff() && (uid == request.auth.uid || admin());
+    }
     match /meta/{id}   { allow read: if staff(); allow write: if admin(); }
     match /duties/{id} { allow read: if staff(); allow write: if admin(); }
     match /events/{id} { allow read: if staff(); allow write: if admin(); }
 
-    // לוח ההודעות: ערוץ לכל קהל יעד. all = כולם; מזהה קבוצה = חברי הקבוצה;
-    // s_<uid> = העותק של השולח. ההנהלה רואה את כל הערוצים. כל איש צוות יכול לשלוח.
+    // לוח ההודעות: ערוץ לכל קהל יעד. all = כולם; מזהה קבוצה = חברי הקבוצה; s_<uid> = העותק של השולח.
+    // ההנהלה רואה את ערוצי הקבוצות; כל איש צוות יכול לשלוח לכל קהל.
+    // יוצא מן הכלל: mgmt = תיבת צוות הניהול. קוראים וכותבים בה רק חברי הקבוצה, גם לא שאר ההנהלה.
     match /channels/{ch}/msgs/{id} {
-      allow read: if staff() && (ch == 'all' || ch == 's_' + request.auth.uid || admin() || inGroup(ch));
+      allow read: if staff() && (ch == 'mgmt' ? inGroup('mgmt') : (ch == 'all' || ch == 's_' + request.auth.uid || admin() || inGroup(ch)));
       allow create: if staff() && request.resource.data.by == request.auth.uid
+        && (ch != 'mgmt' || inGroup('mgmt'))
         && (ch.size() < 2 || ch[0:2] != 's_' || ch == 's_' + request.auth.uid);
-      allow delete: if staff() && (resource.data.by == request.auth.uid || admin());
+      allow delete: if staff() && (ch != 'mgmt' || inGroup('mgmt')) && (resource.data.by == request.auth.uid || admin());
     }
 
     // שיחות פרטיות: רק שני המשתתפים. גם ההנהלה לא קוראת.

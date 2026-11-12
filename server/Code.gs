@@ -1,9 +1,10 @@
 // צוות גורדון - שרת הכניסה (Google Apps Script, רץ בחשבון adgordon248@gmail.com)
 // כניסה לאזור האישי באפליקציה: ת"ז -> קוד חד-פעמי במייל -> אסימון כניסה של Firebase.
 //
-// מי רשאי להיכנס ובאיזה תפקיד - לא נקבע כאן. זו אותה רשימה של לוח המערכות:
-// access_map.json (בריפו gordon-timetable) + השינויים החיים מעמוד המשתמשים (users_admin).
-// הדבר היחיד שנשמר כאן הוא המייל של כל איש צוות (גיליון "מיילים").
+// מי רשאי להיכנס ובאיזה תפקיד: מאגר הצוות ב-Firestore (staffAuth/<uid>: גיבובי ת"ז, מייל, תפקיד),
+// שמנוהל ממסך "ניהול צוות" באפליקציה. כל עוד המאגר ריק (לפני הייבוא הראשון) השרת עובד כמו קודם:
+// הרשימה של לוח המערכות (access_map.json + users_admin) והמיילים מהגיליון "מיילים".
+// בנוסף: tick() רץ כל 5 דקות ושולח התראת דחיפה כ-10 דקות לפני תורנות שמירה.
 //
 // פרטיות: תעודות זהות לא מגיעות לכאן. הדפדפן מגבב את הת"ז (PBKDF2, כמו בלוח)
 // ושולח רק את הגיבוב. הקוד שנשלח במייל נשמר רק כגיבוב, ל-10 דקות.
@@ -40,7 +41,8 @@ function setup() {
     p.setProperty("SHEET_ID", ss.getId());
   }
   CacheService.getScriptCache().remove("access");
-  var added = syncNames_(), mine = fillOwner_(), test = selfTest_();
+  var added = syncNames_(), mine = fillOwner_(), test = selfTest_(), fst = fsTest_(), trig = "פעילות ✓";
+  try { ensureTrigger_(); } catch (err) { trig = "נכשלה - " + err.message; }
   var url = SpreadsheetApp.openById(p.getProperty("SHEET_ID")).getUrl();
   var missing = emails_().filter(function (x) { return !x.email; }).length;
   MailApp.sendEmail(owner_(), APP_NAME + " - שרת הכניסה",
@@ -48,7 +50,7 @@ function setup() {
     (added ? "נוספו לגיליון " + added + " שמות חדשים.\n" : "") +
     (mine ? "קוד הכניסה של " + mine + " יישלח ל-" + owner_() + " (אפשר לשנות בגיליון).\n" : "") +
     (missing ? "חסר מייל ל-" + missing + " אנשי צוות - הם לא יוכלו להיכנס עד שימולא.\n" : "לכל אנשי הצוות יש מייל.\n") +
-    "\nבדיקת החיבור ל-Firebase: " + test + "\n");
+    "\nבדיקת החיבור ל-Firebase: " + test + "\nבדיקת הקריאה ממאגר הצוות: " + fst + "\nהתראות על שמירות (בדיקה כל 5 דקות): " + trig + "\n");
   Logger.log("sheet: " + url + " | added: " + added + " | missing emails: " + missing + " | firebase: " + test);
 }
 
@@ -63,6 +65,8 @@ function doPost(e) {
     var r = JSON.parse((e && e.postData && e.postData.contents) || "{}");
     if (r.a === "code") out = sendCode_(String(r.h || ""));
     else if (r.a === "verify") out = verify_(String(r.h || ""), String(r.c || ""));
+    else if (r.a === "import") out = import_(String(r.t || ""));
+    else if (r.a === "pushtest") out = pushTest_(String(r.t || ""));
     else out = {ok: false, error: "פעולה לא מוכרת."};
   } catch (err) { out = {ok: false, error: "שגיאה בשרת: " + err.message}; }
   return json_(out);
@@ -72,7 +76,7 @@ function sendCode_(h) {
   if (!/^[0-9a-f]{64}$/.test(h)) return {ok: false, error: "בקשה לא תקינה."};
   var u = access_()[h];
   if (!u) return {ok: false, error: "תעודת הזהות לא מופיעה ברשימת הצוות. אם זו טעות - לפנות לאסיף."};
-  var to = emailOf_(u.n);
+  var to = mailFor_(u);
   if (!to) return {ok: false, error: "עדיין לא רשום מייל עבורך. לבקש מאסיף להוסיף אותו."};
   var c = CacheService.getScriptCache(), lock = LockService.getScriptLock(), code;
   if (!lock.tryLock(10000)) return {ok: false, error: "המערכת עמוסה. לנסות שוב בעוד רגע."};
@@ -123,10 +127,23 @@ function verify_(h, code) {
   return {ok: true, token: customToken_(uidOf_(u.n), claims), name: u.n};
 }
 
-// רשימת ההרשאות של לוח המערכות, ממוזגת בדיוק כמו בלוח (mergeAccess ב-viewer).
+// מי נכנס: גיבוב ת"ז -> {n: שם, r: תפקיד, h: בית, e: מייל}. המקור: staffAuth ב-Firestore.
+// מאגר ריק = עוד לא יובא: הרשימה של לוח המערכות (בלי e - המייל מהגיליון).
 function access_() {
   var c = CacheService.getScriptCache(), hit = c.get("access");
   if (hit) return JSON.parse(hit);
+  var m = {}, docs = fsList_("staffAuth");
+  if (docs.length) docs.forEach(function (d) {
+    (d.h || []).forEach(function (h) { var u = {n: d.name, r: d.role || "teacher", e: d.email || ""}; if (d.house) u.h = d.house; if (d.name) m[h] = u; });
+  });
+  else m = legacy_();
+  c.put("access", JSON.stringify(m), 120);
+  return m;
+}
+function mailFor_(u) { return u.e !== undefined ? (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(u.e) ? u.e : "") : emailOf_(u.n); }
+
+// הרשימה של לוח המערכות, ממוזגת בדיוק כמו בלוח (mergeAccess ב-viewer). משמשת עד הייבוא, ובייבוא עצמו.
+function legacy_() {
   var m = JSON.parse(UrlFetchApp.fetch(ACCESS_URL).getContentText());
   try {   // אם שרת המשתמשים לא עונה - הרשימה הבסיסית, כמו בלוח
     var live = JSON.parse(UrlFetchApp.fetch(USERS_API, {muteHttpExceptions: true}).getContentText());
@@ -135,8 +152,142 @@ function access_() {
       Object.keys(live.users || {}).forEach(function (h) { m[h] = live.users[h]; });
     }
   } catch (err) {}
-  c.put("access", JSON.stringify(m), 300);
   return m;
+}
+
+// ייבוא חד-פעמי (כפתור במסך ניהול הצוות, הנהלה בלבד): מעתיק את רשימת לוח המערכות + המיילים מהגיליון
+// אל staffAuth ו-staff. מי שכבר קיים במאגר לא נדרס. מרגע שיש במאגר אנשים - הוא המקור היחיד לכניסה.
+function import_(idToken) {
+  var who = whoIs_(idToken);
+  if (!who || who.r !== "admin") return {ok: false, error: "הפעולה פתוחה להנהלה בלבד."};
+  var m = legacy_(), by = {}, mail = {}, have = {}, added = 0;
+  emails_().forEach(function (x) { mail[x.name] = x.email; });
+  fsList_("staffAuth").forEach(function (d) { have[d.id] = 1; });
+  Object.keys(m).forEach(function (h) {
+    var u = m[h]; if (!u.n) return;
+    var p = by[u.n] = by[u.n] || {name: u.n, h: [], role: u.r || "teacher", email: mail[u.n] || ""};
+    p.h.push(h); if (u.h) p.house = u.h;
+  });
+  Object.keys(by).forEach(function (n) {
+    var uid = uidOf_(n), p = by[n];
+    if (have[uid]) return;
+    fsPatch_("staffAuth/" + uid, p);
+    fsPatch_("staff/" + uid, {name: n, role: p.role}, ["name", "role"]);
+    added++;
+  });
+  CacheService.getScriptCache().remove("access");
+  log_("import", who.n, added + " נוספו");
+  return {ok: true, added: added, total: Object.keys(by).length};
+}
+
+// מי מחזיק באסימון הזה (ID token של Firebase): {uid, n, r}
+function whoIs_(idToken) {
+  if (!idToken) return null;
+  var r = UrlFetchApp.fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + API_KEY, {
+    method: "post", contentType: "application/json", muteHttpExceptions: true, payload: JSON.stringify({idToken: idToken})});
+  if (r.getResponseCode() !== 200) return null;
+  var u = (JSON.parse(r.getContentText()).users || [])[0];
+  if (!u) return null;
+  var c = {}; try { c = JSON.parse(u.customAttributes || "{}"); } catch (err) {}
+  return {uid: u.localId, n: c.n || "", r: c.r || ""};
+}
+
+// ---- Firestore ו-FCM דרך REST, עם אסימון של חשבון השירות ----
+var FS = "https://firestore.googleapis.com/v1/projects/" + PROJECT_ID + "/databases/(default)/documents/";
+function oauth_() {
+  var c = CacheService.getScriptCache(), hit = c.get("oauth");
+  if (hit) return hit;
+  var sa = saKey_(), now = Math.floor(Date.now() / 1000);
+  var input = b64_(JSON.stringify({alg: "RS256", typ: "JWT"})) + "." + b64_(JSON.stringify({iss: sa.client_email, aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600,
+    scope: "https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/firebase.messaging"}));
+  var r = UrlFetchApp.fetch("https://oauth2.googleapis.com/token", {method: "post", muteHttpExceptions: true,
+    payload: {grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: input + "." + b64_(Utilities.computeRsaSha256Signature(input, sa.private_key))}});
+  var j = JSON.parse(r.getContentText());
+  if (!j.access_token) throw new Error("חשבון השירות לא קיבל גישה: " + (j.error_description || j.error || r.getResponseCode()));
+  c.put("oauth", j.access_token, 3000);
+  return j.access_token;
+}
+function fsDec_(v) {
+  if ("stringValue" in v) return v.stringValue;
+  if ("booleanValue" in v) return v.booleanValue;
+  if ("integerValue" in v) return Number(v.integerValue);
+  if ("doubleValue" in v) return v.doubleValue;
+  if ("arrayValue" in v) return (v.arrayValue.values || []).map(fsDec_);
+  if ("mapValue" in v) return fsObj_(v.mapValue.fields || {});
+  return null;
+}
+function fsObj_(f) { var o = {}; Object.keys(f).forEach(function (k) { o[k] = fsDec_(f[k]); }); return o; }
+function fsEnc_(x) {
+  if (typeof x === "string") return {stringValue: x};
+  if (typeof x === "boolean") return {booleanValue: x};
+  if (typeof x === "number") return x % 1 === 0 ? {integerValue: String(x)} : {doubleValue: x};
+  if (Array.isArray(x)) return {arrayValue: {values: x.map(fsEnc_)}};
+  if (x && typeof x === "object") { var f = {}; Object.keys(x).forEach(function (k) { f[k] = fsEnc_(x[k]); }); return {mapValue: {fields: f}}; }
+  return {nullValue: null};
+}
+function fsList_(col) {
+  var out = [], page = "";
+  do {
+    var r = UrlFetchApp.fetch(FS + col + "?pageSize=300" + (page ? "&pageToken=" + encodeURIComponent(page) : ""), {headers: {Authorization: "Bearer " + oauth_()}, muteHttpExceptions: true});
+    if (r.getResponseCode() !== 200) throw new Error("קריאה מ-Firestore נכשלה (" + col + "): " + r.getResponseCode());
+    var j = JSON.parse(r.getContentText());
+    (j.documents || []).forEach(function (d) { var o = fsObj_(d.fields || {}); o.id = d.name.split("/").pop(); out.push(o); });
+    page = j.nextPageToken || "";
+  } while (page);
+  return out;
+}
+// כתיבת מסמך. mask = רשימת שדות לעדכן בלי לגעת באחרים (בלי mask - המסמך מוחלף).
+function fsPatch_(path, obj, mask) {
+  var q = (mask || []).map(function (k) { return "updateMask.fieldPaths=" + encodeURIComponent(k); }).join("&");
+  var r = UrlFetchApp.fetch(FS + path + (q ? "?" + q : ""), {method: "patch", contentType: "application/json", muteHttpExceptions: true,
+    headers: {Authorization: "Bearer " + oauth_()}, payload: JSON.stringify({fields: fsEnc_(obj).mapValue.fields})});
+  if (r.getResponseCode() !== 200) throw new Error("כתיבה ל-Firestore נכשלה (" + path + "): " + r.getResponseCode());
+}
+
+// ---- התראות דחיפה על תורנות שמירה ----
+// כל מכשיר שהפעיל התראות כותב ל-push/<uid>: {tokens: {<אסימון FCM>: זמן}, duty: [{day, from, to, place}]}.
+// tick רץ כל 5 דקות (הטריגר נוצר ב-setup) ושולח התראה 5-12 דקות לפני תחילת שמירה. פעם אחת לכל שמירה.
+var LEAD_MIN = 5, LEAD_MAX = 12;
+function tick() {
+  var p = Utilities.formatDate(new Date(), "Asia/Jerusalem", "u|HH|mm|yyyy-MM-dd").split("|");
+  var day = Number(p[0]) % 7, mins = Number(p[1]) * 60 + Number(p[2]), sent = 0;   // u: שני=1 ... ראשון=7 -> ראשון=0
+  if (day === 6 || mins < 6 * 60 + 30 || mins > 16 * 60) return 0;
+  var c = CacheService.getScriptCache();
+  fsList_("push").forEach(function (d) {
+    (d.duty || []).forEach(function (s) {
+      var t = String(s.from || "").split(":"), lead = Number(t[0]) * 60 + Number(t[1]) - mins;
+      if (s.day !== day || !(lead >= LEAD_MIN && lead <= LEAD_MAX)) return;
+      var key = "p_" + d.id + "_" + p[3] + "_" + s.from;
+      if (c.get(key)) return;
+      c.put(key, "1", 3600);
+      Object.keys(d.tokens || {}).forEach(function (tok) {
+        if (push_(tok, "שמירה בעוד " + lead + " דקות", s.place + " · " + s.from + "–" + s.to, "#/duty")) sent++;
+      });
+    });
+  });
+  return sent;
+}
+function push_(token, title, body, url) {
+  var r = UrlFetchApp.fetch("https://fcm.googleapis.com/v1/projects/" + PROJECT_ID + "/messages:send", {method: "post", contentType: "application/json", muteHttpExceptions: true,
+    headers: {Authorization: "Bearer " + oauth_()},
+    payload: JSON.stringify({message: {token: token, data: {title: title, body: body, url: url || ""}, webpush: {headers: {Urgency: "high", TTL: "900"}}}})});
+  return r.getResponseCode() === 200;
+}
+// "שליחת התראת בדיקה" מהאפליקציה: לכל המכשירים של מי שביקש
+function pushTest_(idToken) {
+  var who = whoIs_(idToken);
+  if (!who) return {ok: false, error: "צריך להיכנס מחדש."};
+  var d = fsList_("push").filter(function (x) { return x.id === who.uid; })[0], n = 0;
+  Object.keys((d && d.tokens) || {}).forEach(function (tok) { if (push_(tok, "התראת בדיקה", "ההתראות של אפליקציית גורדון פועלות במכשיר הזה.", "#/duty")) n++; });
+  return n ? {ok: true, sent: n} : {ok: false, error: "ההתראה לא נשלחה. לכבות ולהפעיל שוב את ההתראות במכשיר."};
+}
+function ensureTrigger_() {
+  var has = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === "tick"; });
+  if (!has) ScriptApp.newTrigger("tick").timeBased().everyMinutes(5).create();
+}
+function fsTest_() {
+  try { var n = fsList_("staffAuth").length; return "עובדת ✓ (" + (n ? n + " אנשי צוות במאגר" : "המאגר ריק - הכניסה לפי רשימת לוח המערכות עד הייבוא") + ")"; }
+  catch (err) { return "נכשלה - " + err.message; }
 }
 
 function syncNames_() {

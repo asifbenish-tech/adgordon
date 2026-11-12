@@ -100,13 +100,16 @@ async function sendCode(code) {
   step.busy = false; changed();
 }
 
-async function api(body) {
+export const firebaseApp = () => fbApp;
+// אסימון הזיהוי של המשתמש המחובר: מוכיח לשרת הכניסה מי מבקש (ייבוא, התראת בדיקה)
+export const idToken = () => auth && auth.currentUser ? auth.currentUser.getIdToken() : Promise.resolve("");
+export async function api(body) {
   const r = await fetch(AUTH_API, {method: "POST", headers: {"Content-Type": "text/plain;charset=utf-8"}, body: JSON.stringify(body)});
   return r.json();
 }
 
 // אותו גיבוב כמו בכניסה ללוח המערכות (PBKDF2-SHA256, 100 אלף איטרציות)
-async function idHash(raw) {
+export async function idHash(raw) {
   const id = raw.replace(/\D/g, "").padStart(9, "0"), enc = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", enc.encode(id), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits({name: "PBKDF2", hash: "SHA-256", salt: enc.encode(ID_SALT), iterations: 100000}, key, 256);

@@ -1,28 +1,31 @@
 // הודעות: לוח הודעות לפי קהל יעד + שיחות פרטיות בין אנשי צוות.
 import {S} from "../state.js";
 import {$, esc, ls, ago, hhmm, dayLabel} from "../util.js";
-import {isAdmin, groups, groupLabel, people, person, sendBoard, delBoard, unreadBoard, unreadChats, chatUnread, otherOf, cidOf, openChat, sendChat, markChatSeen} from "../data.js";
+import {isAdmin, groups, groupLabel, people, person, sendBoard, delBoard, unreadBoard, unreadChats, chatUnread, otherOf, cidOf, openChat, sendChat, markChatSeen, MGMT, isMgmt, unreadMgmt} from "../data.js";
 import {loading, empty, field, tags, avatar, chips, ui, tryDo} from "../ui.js";
 
 let tab = "board", q = "", flt = "";
 
-export const boardItem = (m, plain) => '<article class="msg' + (m.at > (ls("adgSeen") || 0) && m.by !== S.user.uid ? " new" : "") + '"><div class="mh"><b>' + esc(m.title) + "</b>" +
+export const boardItem = (m, plain) => '<article class="msg' + (m.at > (ls((m.to || []).includes(MGMT) ? "adgSeenM" : "adgSeen") || 0) && m.by !== S.user.uid ? " new" : "") + '"><div class="mh"><b>' + esc(m.title) + "</b>" +
   (!plain && (m.by === S.user.uid || isAdmin()) ? '<button type="button" class="del" data-del="' + esc(m.mid || m.id) + '" aria-label="מחיקה"><i class="fa-solid fa-trash-can"></i></button>' : "") + "</div>" +
   '<div class="tags">' + tags((m.to || ["all"]).filter(groupLabel)) + "</div><p>" + esc(m.body) + "</p><small>" + esc(m.byName || "") + " · " + esc(ago(m.at)) + "</small></article>";
 
-function boardHtml() {
-  if (S.board == null) return loading;
-  return '<details class="add"><summary><i class="fa-solid fa-pen"></i> הודעה חדשה</summary><form id="bform">' +
-    '<fieldset class="aud"><legend>מי יראה את ההודעה</legend><label class="pill"><input type="checkbox" name="to" value="all" checked><span>כל הצוות</span></label>' +
-    groups().map(g => '<label class="pill"><input type="checkbox" name="to" value="' + esc(g.id) + '"><span>' + esc(g.label) + "</span></label>").join("") + "</fieldset>" +
+// kind: "board" = לוח ההודעות הכללי (בוחרים קהל יעד); "mgmt" = תיבת צוות הניהול (רק חברי הקבוצה רואים וכותבים)
+function boardHtml(kind) {
+  const list = kind === "mgmt" ? S.mgmt : S.board;
+  if (list == null) return loading;
+  return (kind === "mgmt" ? '<p class="hint"><i class="fa-solid fa-lock"></i> התיבה הזו פתוחה רק לחברי צוות הניהול.</p>' : "") +
+    '<details class="add"><summary><i class="fa-solid fa-pen"></i> ' + (kind === "mgmt" ? "הודעה חדשה לצוות הניהול" : "הודעה חדשה") + '</summary><form id="bform">' +
+    (kind === "mgmt" ? '<input type="checkbox" name="to" value="' + MGMT + '" checked hidden>' : '<fieldset class="aud"><legend>מי יראה את ההודעה</legend><label class="pill"><input type="checkbox" name="to" value="all" checked><span>כל הצוות</span></label>' +
+    groups().filter(g => g.id !== MGMT).map(g => '<label class="pill"><input type="checkbox" name="to" value="' + esc(g.id) + '"><span>' + esc(g.label) + "</span></label>").join("") + "</fieldset>") +
     field("כותרת", '<input name="title" required maxlength="80">') + field("תוכן ההודעה", '<textarea name="body" rows="4" required maxlength="2000"></textarea>') +
     '<button class="btn">שליחה</button></form></details>' +
-    (S.board.length ? S.board.map(m => boardItem(m)).join("") : empty("אין הודעות", "הודעות לצוות יופיעו כאן."));
+    (list.length ? list.map(m => boardItem(m)).join("") : empty("אין הודעות", kind === "mgmt" ? "הודעות של צוות הניהול יופיעו כאן." : "הודעות לצוות יופיעו כאן."));
 }
 
 function chatsHtml() {
   if (S.chats == null) return loading;
-  return '<a class="btn ghost" href="#/new"><i class="fa-solid fa-pen-to-square"></i> שיחה חדשה</a>' +
+  return '<a class="btn ghost" href="#/new"><i class="fa-solid fa-address-book"></i> אנשי הצוות: שיחה חדשה או חיוג</a>' +
     (S.chats.length ? '<div class="list">' + S.chats.map(c => { const o = person(otherOf(c)), l = c.last || {};
       return '<a class="item chatrow' + (chatUnread(c) ? " new" : "") + '" href="#/chat/' + encodeURIComponent(o.uid) + '">' + avatar(o) + "<div><b>" + esc(o.full) + "</b><span>" +
         (l.by === S.user.uid ? "את/ה: " : "") + esc(l.text || "") + "</span></div><small>" + (l.at ? esc(ago(l.at)) : "") + "</small></a>"; }).join("") + "</div>"
@@ -32,14 +35,17 @@ function chatsHtml() {
 export const msg = {
   title: () => "הודעות",
   html() {
-    const nb = unreadBoard(), nc = unreadChats(), n = x => x ? " <em>" + x + "</em>" : "";
-    return '<div class="seg" role="group" aria-label="תצוגה"><button type="button" data-tab="board" aria-pressed="' + (tab === "board") + '">לוח הודעות' + n(tab === "board" ? 0 : nb) + "</button>" +
-      '<button type="button" data-tab="chats" aria-pressed="' + (tab === "chats") + '">שיחות פרטיות' + n(nc) + "</button></div>" + (tab === "board" ? boardHtml() : chatsHtml());
+    if (tab === "mgmt" && !isMgmt()) tab = "board";
+    const n = x => x ? " <em>" + x + "</em>" : "", btn = (id, label, cnt) => '<button type="button" data-tab="' + id + '" aria-pressed="' + (tab === id) + '">' + label + n(tab === id && id !== "chats" ? 0 : cnt) + "</button>";
+    return '<div class="seg" role="group" aria-label="תצוגה">' + btn("board", "לוח הודעות", unreadBoard()) + (isMgmt() ? btn("mgmt", "צוות ניהול", unreadMgmt()) : "") + btn("chats", "שיחות", unreadChats()) + "</div>" +
+      (tab === "chats" ? chatsHtml() : boardHtml(tab));
   },
   bind(el) {
     for (const b of el.querySelectorAll("[data-tab]")) b.onclick = () => { tab = b.dataset.tab; ui.render(); };
-    if (tab === "board" && S.board) setTimeout(() => ls("adgSeen", Date.now()), 0);   // נראו; הסימון "חדש" נשאר עד הציור הבא
-    for (const b of el.querySelectorAll("[data-del]")) b.onclick = () => { const m = S.board.find(x => (x.mid || x.id) === b.dataset.del); if (m && confirm("למחוק את ההודעה לכולם?")) tryDo(() => delBoard(m)); };
+    // נראו; הסימון "חדש" נשאר עד הציור הבא
+    if (tab === "board" && S.board) setTimeout(() => ls("adgSeen", Date.now()), 0);
+    if (tab === "mgmt" && S.mgmt) setTimeout(() => ls("adgSeenM", Date.now()), 0);
+    for (const b of el.querySelectorAll("[data-del]")) b.onclick = () => { const m = [...(S.board || []), ...(S.mgmt || [])].find(x => (x.mid || x.id) === b.dataset.del); if (m && confirm("למחוק את ההודעה לכולם?")) tryDo(() => delBoard(m)); };
     const f = $("bform"); if (!f) return;
     const boxes = [...f.querySelectorAll("[name=to]")];
     for (const c of boxes) c.onchange = () => {   // "כל הצוות" וקבוצות לא הולכים יחד
@@ -59,14 +65,15 @@ export const msg = {
 // ---- בחירת איש צוות לשיחה חדשה ----
 const pickList = () => {
   const s = q.trim(), list = people().filter(p => p.uid !== S.user.uid && !p.off && (!flt || p.groups.includes(flt)) && (!s || p.full.includes(s) || p.name.includes(s)));
-  return list.length ? list.map(p => '<a class="item" href="#/chat/' + encodeURIComponent(p.uid) + '">' + avatar(p) + "<div><b>" + esc(p.full) + '</b><div class="tags">' + tags(p.groups) + "</div></div></a>").join("") : empty("לא נמצאו אנשי צוות");
+  return list.length ? list.map(p => '<a class="item" href="#/chat/' + encodeURIComponent(p.uid) + '">' + avatar(p) + "<div><b>" + esc(p.full) + '</b><div class="tags">' + tags(p.groups) + "</div></div>" + (p.phone ? '<span class="call" data-tel="' + esc(p.phone) + '" role="link" tabindex="0" aria-label="חיוג אל ' + esc(p.full) + '"><i class="fa-solid fa-phone"></i></span>' : "") + "</a>").join("") : empty("לא נמצאו אנשי צוות");
 };
 export const pick = {
   parent: "msg", tab: "msg",
-  title: () => "שיחה חדשה",
+  title: () => "אנשי הצוות",
   html: () => '<input class="search" id="pq" type="search" placeholder="חיפוש לפי שם" value="' + esc(q) + '" autocomplete="off">' + chips(groups(), flt, "data-g") + '<div class="list" id="plist">' + pickList() + "</div>",
   bind(el) {
     $("pq").oninput = e => { q = e.target.value; $("plist").innerHTML = pickList(); };
+    $("plist").onclick = e => { const c = e.target.closest("[data-tel]"); if (c) { e.preventDefault(); location.href = "tel:" + c.dataset.tel.replace(/[^\d+]/g, ""); } };
     for (const b of el.querySelectorAll("[data-g]")) b.onclick = () => { flt = b.dataset.g; ui.render(); };
   },
   update() { $("plist").innerHTML = pickList(); }

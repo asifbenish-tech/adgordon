@@ -2,7 +2,7 @@
 import {S} from "../state.js";
 import {PORTAL_URL} from "../config.js";
 import {$, esc, DAYN} from "../util.js";
-import {isAdmin, myFull, myGroups, nextDuty, calDays, unreadChats, unreadBoard} from "../data.js";
+import {isAdmin, myFull, myGroups, nextDuty, calDays, unreadChats, unreadBoard, unreadMgmt} from "../data.js";
 import {signOut} from "../auth.js";
 import {loading, empty, secHead, tags, avatar} from "../ui.js";
 import {slots, slotHtml, todayIdx} from "./tt.js";
@@ -17,7 +17,7 @@ export default {
   title: () => "שלום, " + myFull().split(" ")[0],
   html() {
     const u = S.user, d = todayIdx(), list = S.T ? slots(u.name, d) : [], busy = list.filter(s => s.ev.length).length;
-    const nd = S.duty && S.staff ? nextDuty() : null, g = S.staff ? myGroups() : [], un = unreadBoard() + unreadChats();
+    const nd = S.duty && S.staff ? nextDuty() : null, g = S.staff ? myGroups() : [], un = unreadBoard() + unreadChats() + unreadMgmt();
     const days = S.sheet && S.events ? calDays() : null, td = days && days.find(x => x.date === today()), soon = days ? days.filter(x => x.date > today()) : [];
     const wk = new Date(); wk.setDate(wk.getDate() + 7); const week = soon.filter(x => new Date(x.date) <= wk).length + (td ? 1 : 0);
     let h = "";

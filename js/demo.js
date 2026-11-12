@@ -17,11 +17,12 @@ export function seed() {
       {id: u(0), name: o(0), groups: ["mgmt"]}, {id: u(1), name: o(1), groups: ["hA", "home"]},
       {id: u(2), name: o(2), groups: ["hA"]}, {id: u(3), name: o(3), groups: ["hB", "home"]}, {id: u(4), name: o(4), groups: ["hC"]}],
     meta: [],
+    staffAuth: [{id: me.uid, name: me.name, h: ["demo"], email: "me@example.com", role: me.role}, {id: u(0), name: o(0), h: ["demo"], email: "", role: "teacher"}],
     events: [
       {id: "e1", date: dd(2), time: "16:00", title: "אסיפת הורים", place: "בכיתות", note: ""},
       {id: "e2", date: dd(9), time: "", title: "יום טיול שכבתי", place: "", note: "שכבת ו"},
       {id: "e3", date: dd(34), time: "18:00", title: "טקס חנוכה", place: "אולם", note: ""}],
-    "channels/all/msgs": [m1], "channels/home/msgs": [m2], "channels/hA/msgs": [m3],
+    "channels/all/msgs": [m1], "channels/mgmt/msgs": [msg("m4", "תקציב טיולים", "הודעה לדוגמה בתיבת צוות הניהול. רק חברי הקבוצה רואים אותה.", o(0), now - 5 * H, ["mgmt"])], "channels/home/msgs": [m2], "channels/hA/msgs": [m3],
     chats: [{id: cid, members: [me.uid, u(0)].sort(), names: {[me.uid]: me.name, [u(0)]: o(0)}, last: {text: "תודה, נדבר מחר", at: now - 2 * H, by: u(0)}}]
   };
   db["chats/" + cid + "/msgs"] = [

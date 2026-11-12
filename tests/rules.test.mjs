@@ -33,6 +33,26 @@ await t("cannot unblock self", no(updateDoc(doc(B, "staff/t_blocked"), {off: fal
 await t("admin sets groups", ok(setDoc(doc(A, "staff/t_two"), {name: "t_two", groups: ["hB"]}, {merge: true})));
 await t("admin edits group list", ok(setDoc(doc(A, "meta/groups"), {list: []})));
 await t("teacher cannot edit group list", no(setDoc(doc(T1, "meta/groups"), {list: []})));
+// פרטי כניסה והתראות
+await t("admin writes login details", ok(setDoc(doc(A, "staffAuth/t_one"), {name: "t_one", h: ["x"], email: "a@b.c", role: "teacher"})));
+await t("admin reads login details", ok(getDocs(collection(A, "staffAuth"))));
+await t("teacher cannot read login details", no(getDocs(collection(T1, "staffAuth"))));
+await t("teacher cannot read own login details", no(getDoc(doc(T1, "staffAuth/t_one"))));
+await t("teacher cannot write login details", no(setDoc(doc(T1, "staffAuth/t_one"), {h: ["mine"]})));
+await t("own push registration", ok(setDoc(doc(T1, "push/t_one"), {tokens: {a: 1}, duty: []}, {merge: true})));
+await t("cannot read others' push registration", no(getDoc(doc(T2, "push/t_one"))));
+await t("cannot write others' push registration", no(setDoc(doc(T2, "push/t_one"), {tokens: {evil: 1}})));
+await t("admin cannot read push tokens", no(getDoc(doc(A, "push/t_one"))));
+// תפקיד מהמאגר גובר על האסימון, מיד
+await t("teacher cannot make self admin", no(updateDoc(doc(T2, "staff/t_two"), {role: "admin"})));
+await t("admin promotes a teacher", ok(setDoc(doc(A, "staff/t_two"), {role: "admin"}, {merge: true})));
+await t("promoted teacher is admin at once", ok(setDoc(doc(T2, "meta/x"), {a: 1})));
+await t("admin demotes", ok(setDoc(doc(A, "staff/t_two"), {role: "teacher"}, {merge: true})));
+await t("demoted loses admin at once", no(setDoc(doc(T2, "meta/x"), {a: 2})));
+await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(), "staff/t_admin"), {name: "t_admin", groups: [], role: "teacher"}));
+await t("token says admin but database says teacher: not admin", no(setDoc(doc(A, "meta/x"), {a: 3})));
+await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(), "staff/t_admin"), {name: "t_admin", groups: [], role: "admin"}));
+await t("admin again", ok(setDoc(doc(A, "meta/x"), {a: 4})));
 // תמונות פרופיל
 const jpg = "data:image/jpeg;base64," + "A".repeat(2000);
 await t("own photo", ok(setDoc(doc(T1, "photos/t_one"), {data: jpg, at: 1})));
@@ -62,6 +82,15 @@ await t("post into own outbox", ok(setDoc(doc(T2, "channels/s_t_two/msgs/m2"), m
 await t("cannot delete other's message", no(deleteDoc(doc(T2, "channels/hA/msgs/m1"))));
 await t("sender deletes own message (even outside the group)", ok(deleteDoc(doc(T2, "channels/hA/msgs/m2"))));
 await t("admin deletes any message", ok(deleteDoc(doc(A, "channels/hA/msgs/m1"))));
+// תיבת צוות הניהול: רק חברי הקבוצה, גם לא הנהלה שאינה חברה
+await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), "staff/t_one"), {name: "t_one", groups: ["hA", "mgmt"]}); await setDoc(doc(c.firestore(), "channels/mgmt/msgs/g1"), m("t_one")); });
+await t("mgmt member reads the mgmt box", ok(recent(T1, "mgmt")));
+await t("mgmt member posts to the mgmt box", ok(setDoc(doc(T1, "channels/mgmt/msgs/g2"), m("t_one"))));
+await t("non-member cannot read the mgmt box", no(recent(T2, "mgmt")));
+await t("non-member cannot post to the mgmt box", no(setDoc(doc(T2, "channels/mgmt/msgs/g3"), m("t_two"))));
+await t("admin who is not in mgmt cannot read the mgmt box", no(recent(A, "mgmt")));
+await t("admin who is not in mgmt cannot delete there", no(deleteDoc(doc(A, "channels/mgmt/msgs/g1"))));
+await t("mgmt member deletes own mgmt message", ok(deleteDoc(doc(T1, "channels/mgmt/msgs/g2"))));
 // שיחות פרטיות
 const cid = "t_one__t_two", chat = {members: ["t_one", "t_two"], names: {}, last: {text: "hi", at: 1, by: "t_one"}};
 await t("no msg before chat exists", no(addDoc(collection(T1, "chats/" + cid + "/msgs"), {by: "t_one", text: "hi", at: 1})));
