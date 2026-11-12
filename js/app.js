@@ -1,0 +1,55 @@
+// המעטפת: ניווט, סרגל עליון, לשוניות. כל מסך הוא מודול ב-js/views עם {title, html, bind, update?}.
+import {S, onChange} from "./state.js";
+import {DEMO} from "./config.js";
+import {$, esc} from "./util.js";
+import {ui} from "./ui.js";
+import {initAuth, loginHtml, bindLogin} from "./auth.js";
+import {unreadBoard, unreadChats} from "./data.js";
+import home from "./views/home.js";
+import tt from "./views/tt.js";
+import duty from "./views/duty.js";
+import cal from "./views/cal.js";
+import {msg, chat, pick} from "./views/msg.js";
+import staff from "./views/staff.js";
+
+const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff};
+const TABS = [["home", "היום", "fa-house"], ["msg", "הודעות", "fa-comments"], ["tt", "מערכת", "fa-table-cells"], ["duty", "שמירות", "fa-shield-halved"], ["cal", "אירועים", "fa-calendar-days"]];
+let last = "";
+
+export const route = () => { const [name, arg] = location.hash.replace(/^#\/?/, "").split("/"); return {name: VIEWS[name] ? name : "home", arg: arg ? decodeURIComponent(arg) : ""}; };
+export const go = h => { if (location.hash === "#/" + h) render(true); else location.hash = "#/" + h; };
+
+function render(force) {
+  const el = $("view"), r = route(), v = VIEWS[r.name], key = r.name + "/" + r.arg;
+  document.body.classList.toggle("in", !!S.user);
+  if (!S.ready) { el.innerHTML = '<p class="lead">טוען…</p>'; return; }
+  if (!S.user) { $("title").textContent = "בית חינוך גורדון"; $("back").hidden = true; el.innerHTML = loginHtml(); bindLogin(); last = ""; return; }
+  const tab = v.tab || r.name;
+  for (const a of $("tabs").children) a.setAttribute("aria-current", a.dataset.t === tab ? "page" : "false");
+  badge();
+  $("title").textContent = v.title(r.arg);
+  $("back").hidden = !v.parent;
+  // מי שמקליד עכשיו בטופס: לא לדרוס לו את המסך כשמגיע עדכון ברקע
+  const typing = el.contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+  if (!force && key === last && (typing || v.live)) { if (v.update) v.update(el, r.arg); return; }
+  const top = el.scrollTop, same = key === last;
+  last = key;
+  el.innerHTML = (DEMO ? '<div class="demo"><b>מצב הדגמה.</b> נתוני דוגמה שנשמרים רק במכשיר הזה.</div>' : "") +
+    (S.err ? '<div class="err" role="alert">' + esc(S.err) + "</div>" : "") + v.html(r.arg);
+  v.bind(el, r.arg);
+  if (!same) window.scrollTo(0, 0); else el.scrollTop = top;
+}
+
+function badge() {
+  const em = document.querySelector('#tabs a[data-t="msg"] em'), n = unreadBoard() + unreadChats();
+  em.hidden = !n; em.textContent = n || "";
+}
+
+$("tabs").innerHTML = TABS.map(t => '<a href="#/' + t[0] + '" data-t="' + t[0] + '"><i class="fa-solid ' + t[2] + '"></i><span>' + t[1] + "</span><em hidden></em></a>").join("");
+$("back").onclick = () => go(VIEWS[route().name].parent || "home");
+ui.render = () => render(true);
+window.addEventListener("hashchange", () => render(true));
+onChange(() => render(false));
+render(true);
+initAuth();
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});

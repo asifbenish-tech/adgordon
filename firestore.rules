@@ -1,0 +1,52 @@
+// כללי הגישה ל-Firestore של פרויקט gordon-staff, עבור אפליקציית adgordon.
+// מדביקים ב: Firebase console -> Firestore Database -> Rules -> Publish.
+// נכנסים רק דרך שרת הכניסה (server/Code.gs), שחותם לכל איש צוות על שם (n) ותפקיד (r).
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function me() { return /databases/$(database)/documents/staff/$(request.auth.uid); }
+    function signed() { return request.auth != null && request.auth.token.n is string; }
+    // חסימה ע"י ההנהלה (off) נכנסת לתוקף מיד, גם במכשיר שכבר מחובר
+    function staff() { return signed() && !(exists(me()) && get(me()).data.get('off', false) == true); }
+    function admin() { return staff() && request.auth.token.r == 'admin'; }
+    function inGroup(g) { return exists(me()) && g in get(me()).data.get('groups', []); }
+
+    // מאגר הצוות: כולם קוראים. כל אחד נרשם בעצמו בכניסה הראשונה, בלי קבוצות.
+    // קבוצות וחסימה - רק ההנהלה.
+    match /staff/{uid} {
+      allow read: if staff();
+      allow create: if admin() || (staff() && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['name', 'groups'])
+        && request.resource.data.name == request.auth.token.n
+        && request.resource.data.groups == []);
+      allow update, delete: if admin();
+    }
+    match /meta/{id}   { allow read: if staff(); allow write: if admin(); }
+    match /duties/{id} { allow read: if staff(); allow write: if admin(); }
+    match /events/{id} { allow read: if staff(); allow write: if admin(); }
+
+    // לוח ההודעות: ערוץ לכל קהל יעד. all = כולם; מזהה קבוצה = חברי הקבוצה;
+    // s_<uid> = העותק של השולח. ההנהלה רואה את כל הערוצים. כל איש צוות יכול לשלוח.
+    match /channels/{ch}/msgs/{id} {
+      allow read: if staff() && (ch == 'all' || ch == 's_' + request.auth.uid || admin() || inGroup(ch));
+      allow create: if staff() && request.resource.data.by == request.auth.uid
+        && (ch.size() < 2 || ch[0:2] != 's_' || ch == 's_' + request.auth.uid);
+      allow delete: if staff() && (resource.data.by == request.auth.uid || admin());
+    }
+
+    // שיחות פרטיות: רק שני המשתתפים. גם ההנהלה לא קוראת.
+    match /chats/{cid} {
+      allow read: if staff() && request.auth.uid in resource.data.members;
+      allow create: if staff() && request.auth.uid in request.resource.data.members
+        && request.resource.data.members.size() == 2
+        && cid == request.resource.data.members[0] + '__' + request.resource.data.members[1];
+      allow update: if staff() && request.auth.uid in resource.data.members
+        && request.resource.data.members == resource.data.members;
+      match /msgs/{id} {
+        allow read: if staff() && request.auth.uid in get(/databases/$(database)/documents/chats/$(cid)).data.members;
+        allow create: if staff() && request.resource.data.by == request.auth.uid
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(cid)).data.members;
+      }
+    }
+  }
+}
