@@ -29,3 +29,6 @@ export const uidOf = name => "t_" + [...new TextEncoder().encode(name)].map(b =>
 export const nameOf = uid => { try { return new TextDecoder().decode(new Uint8Array(uid.slice(2).match(/../g).map(h => parseInt(h, 16)))); } catch (e) { return ""; } };
 export const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 export const heSort = (a, b) => a.localeCompare(b, "he");
+// צבע קבוע לכל שם (לעיגול עם האות הראשונה)
+export const hue = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.codePointAt(0)) % 360; return h; };
+export const norm = s => String(s || "").replace(/[-־'׳"״.]/g, "").replace(/\s+/g, " ").trim();

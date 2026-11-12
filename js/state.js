@@ -6,7 +6,9 @@ export const S = {
   T: ls("adgTT"),        // מערכת השעות: {g, days, teachers, full, homes}
   staff: null,           // [{id: uid, name, groups: [], off?}]
   groupsDoc: null,       // meta/groups
-  duties: null, events: null,
+  duty: null,            // לוח תורנות השמירה השבועי (data/duty.json)
+  events: null,
+  photos: null,          // {uid: "data:image/jpeg;base64,..."} - תמונות הפרופיל
   board: null,           // הודעות לוח, ממוזגות מכל הערוצים שלי
   chats: null,           // השיחות הפרטיות שלי
   chatWith: null, chatMsgs: null,   // השיחה הפתוחה

@@ -2,17 +2,18 @@
 import {S, onChange} from "./state.js";
 import {DEMO} from "./config.js";
 import {$, esc} from "./util.js";
-import {ui} from "./ui.js";
+import {ui, avatar} from "./ui.js";
 import {initAuth, loginHtml, bindLogin} from "./auth.js";
 import {unreadBoard, unreadChats} from "./data.js";
-import home from "./views/home.js";
+import home, {dateLine} from "./views/home.js";
 import tt from "./views/tt.js";
 import duty from "./views/duty.js";
 import cal from "./views/cal.js";
 import {msg, chat, pick} from "./views/msg.js";
 import staff from "./views/staff.js";
+import profile from "./views/profile.js";
 
-const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff};
+const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: profile};
 const TABS = [["home", "היום", "fa-house"], ["msg", "הודעות", "fa-comments"], ["tt", "מערכת", "fa-table-cells"], ["duty", "שמירות", "fa-shield-halved"], ["cal", "אירועים", "fa-calendar-days"]];
 let last = "";
 
@@ -23,11 +24,14 @@ function render(force) {
   const el = $("view"), r = route(), v = VIEWS[r.name], key = r.name + "/" + r.arg;
   document.body.classList.toggle("in", !!S.user);
   if (!S.ready) { el.innerHTML = '<p class="lead">טוען…</p>'; return; }
-  if (!S.user) { $("title").textContent = "בית חינוך גורדון"; $("back").hidden = true; el.innerHTML = loginHtml(); bindLogin(); last = ""; return; }
+  if (!S.user) { document.body.classList.remove("hero"); $("sub").textContent = "אפליקציית הצוות"; $("title").textContent = "בית חינוך א.ד. גורדון"; $("back").hidden = true; el.innerHTML = loginHtml(); bindLogin(); last = ""; return; }
   const tab = v.tab || r.name;
   for (const a of $("tabs").children) a.setAttribute("aria-current", a.dataset.t === tab ? "page" : "false");
   badge();
   $("title").textContent = v.title(r.arg);
+  document.body.classList.toggle("hero", r.name === "home");
+  $("sub").textContent = r.name === "home" ? dateLine() : "בית חינוך א.ד. גורדון";
+  $("me").innerHTML = avatar(S.user);
   $("back").hidden = !v.parent;
   // מי שמקליד עכשיו בטופס: לא לדרוס לו את המסך כשמגיע עדכון ברקע
   const typing = el.contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
