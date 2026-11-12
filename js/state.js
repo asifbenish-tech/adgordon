@@ -7,7 +7,8 @@ export const S = {
   staff: null,           // [{id: uid, name, groups: [], off?}]
   groupsDoc: null,       // meta/groups
   duty: null,            // לוח תורנות השמירה השבועי (data/duty.json)
-  events: null,
+  events: null,          // אירועים שההנהלה הוסיפה ידנית באפליקציה
+  sheet: null,           // לוח האירועים וההערכות מהגיליון: {days: [{date, acts, note, tests}], classes, err?}
   photos: null,          // {uid: "data:image/jpeg;base64,..."} - תמונות הפרופיל
   board: null,           // הודעות לוח, ממוזגות מכל הערוצים שלי
   chats: null,           // השיחות הפרטיות שלי

@@ -2,7 +2,7 @@
 // המבנה ב-Firestore מתועד ב-INTEGRATION.md, וההרשאות ב-firestore.rules.
 import {S, changed} from "./state.js";
 import {watch, put, del} from "./store.js";
-import {DEFAULT_GROUPS, TT_URL} from "./config.js";
+import {DEFAULT_GROUPS, TT_URL, EVENTS_URL} from "./config.js";
 import {ls, today, uidOf, nameOf, rid, heSort, norm, iso, DAYN} from "./util.js";
 
 const HOUSE = {A: "hA", B: "hB", C: "hC"};
@@ -96,7 +96,7 @@ export function startData() {
   if (started) return; started = true;
   const col = (path, key) => watch(path, (list, err) => { if (err) S.err = "לא הצלחנו לטעון את הנתונים. לבדוק את האינטרנט ולפתוח שוב."; else S.err = ""; S[key] = list || S[key] || []; after(key); });
   col("staff", "staff"); col("events", "events");
-  S.duty = ls("adgDuty"); loadDuty();
+  S.duty = ls("adgDuty"); loadDuty(); loadSheet();
   watch("photos", list => { S.photos = {}; for (const x of list || []) S.photos[x.id] = x.data; changed(); });
   watch("meta", list => { S.groupsDoc = (list || []).find(x => x.id === "groups") || {}; after("groups"); });
   watch("chats", list => { S.chats = (list || []).sort((a, b) => ((b.last || {}).at || 0) - ((a.last || {}).at || 0)); syncChat(); changed(); }, {has: ["members", S.user.uid]});
@@ -158,6 +158,44 @@ export async function sendChat(other, text) {
   const me = S.user.uid, cid = cidOf(other), at = Date.now();
   await put("chats", cid, {members: [me, other].sort(), names: {[me]: S.user.name, [other]: person(other).name}, last: {text: text.slice(0, 80), at, by: me}}, true);
   await put("chats/" + cid + "/msgs", null, {by: me, text, at});
+}
+
+// ---- לוח אירועים והערכות: נקרא חי מהגיליון (gviz), עם עותק אחרון במכשיר למקרה שאין רשת ----
+// מבנה הגיליון: תאריך | יום | פעילויות ואירועים (שורה לכל אירוע) | הערות | עמודה לכל כיתה (הערכות).
+const kindOf = t => /חופש|גשר|פגרה/.test(t) ? "vac" : /טיול|סיור|של"ח|מסע/.test(t) ? "trip" : "event";
+const testKind = t => /מבחן|מיצ"ב|בחינ/.test(t) ? "test" : /בוחן/.test(t) ? "quiz" : "work";
+export function parseSheet(text) {
+  const j = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)), rows = j.table.rows.map(r => r.c.map(c => c && c.v != null ? c : null));
+  const str = c => c ? String(c.f != null && typeof c.v !== "string" ? c.f : c.v).trim() : "", lines = c => str(c).split(/\n+/).map(x => x.trim()).filter(Boolean);
+  let classes = [], days = [];
+  for (const r of rows) {
+    const h = r.findIndex(c => str(c) === "הערות");   // שורת הכותרת: אחרי "הערות" באות הכיתות
+    if (h >= 0 && !classes.length) { classes = r.slice(h + 1).map(str); continue; }
+    const i = r.findIndex(c => c && /^Date\(\d+,\d+,\d+/.test(String(c.v)));
+    if (i < 0) continue;
+    const [y, m, d] = String(r[i].v).match(/\d+/g).map(Number), date = y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+    const acts = lines(r[i + 2]).map(t => ({t, k: kindOf(t)})), note = str(r[i + 3]);
+    const tests = r.slice(i + 4).flatMap((c, k) => lines(c).map(t => ({cls: classes[k] || "", t, k: testKind(t)})));
+    if (acts.length || note || tests.length) days.push({date, acts, note, tests});
+  }
+  return {days: days.sort((a, b) => a.date.localeCompare(b.date)), classes: classes.filter(Boolean), at: Date.now()};
+}
+export function loadSheet() {
+  S.sheet = S.sheet || ls("adgSheet");
+  fetch(EVENTS_URL, {cache: "no-store"}).then(r => { if (!r.ok) throw 0; return r.text(); }).then(t => {
+    const d = parseSheet(t); if (!d.days.length) throw 0;
+    S.sheet = d; ls("adgSheet", d); changed();
+  }).catch(() => { S.sheet = S.sheet ? Object.assign(S.sheet, {err: true}) : {days: [], classes: [], err: true}; changed(); });
+}
+// הימים הקרובים שיש בהם משהו: הגיליון + אירועים שנוספו ידנית באפליקציה
+export function calDays() {
+  const m = new Map();
+  for (const d of (S.sheet && S.sheet.days) || []) if (d.date >= today()) m.set(d.date, {date: d.date, acts: d.acts.slice(), note: d.note, tests: d.tests});
+  for (const e of S.events || []) if (e.date >= today()) {
+    if (!m.has(e.date)) m.set(e.date, {date: e.date, acts: [], note: "", tests: []});
+    m.get(e.date).acts.push({t: e.title + (e.time ? " · " + e.time : "") + (e.place ? " · " + e.place : "") + (e.note ? " · " + e.note : ""), k: kindOf(e.title), id: e.id});
+  }
+  return [...m.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 // ---- תמונת פרופיל: photos/<uid> = {data: dataURL של JPEG קטן, at} ----
