@@ -1,9 +1,11 @@
-// לשונית "כלים": אפליקציות נוספות שהצוות משתמש בהן. כל כלי = ריבוע אייקון גדול + שם + הסבר קצר, ונפתח בחלון חדש.
+// לשונית "כלים": כמו מסך הבית של הטלפון - רשת אייקוני אפליקציה עם השם מתחת.
+// קודם הכלים שבתוך האפליקציה (BUILTIN), אחריהם אפליקציות חיצוניות (נפתחות בחלון חדש).
+// במצב עריכה (הנהלה) האפליקציות החיצוניות מוצגות כרשימה עם כפתורי סדר/עריכה/מחיקה.
 // ההנהלה מוסיפה, עורכת, מסדרת ומוחקת כלים כאן; הרשימה נשמרת ב-meta/tools.
 import {S} from "../state.js";
 import {$, esc, rid} from "../util.js";
 import {isAdmin, tools, saveTools} from "../data.js";
-import {empty, field, ui, tryDo, secHead} from "../ui.js";
+import {empty, field, ui, tryDo} from "../ui.js";
 
 const ICONS = ["fa-table-cells", "fa-school", "fa-book-open", "fa-utensils", "fa-chair", "fa-calendar-check", "fa-chalkboard-user", "fa-clipboard-list", "fa-children", "fa-graduation-cap", "fa-file-signature", "fa-laptop", "fa-music", "fa-futbol", "fa-heart-pulse", "fa-link"];
 const COLORS = [["blue", "כחול"], ["teal", "טורקיז"], ["gold", "זהב"], ["green", "ירוק"], ["violet", "סגול"], ["rose", "אדום"], ["slate", "אפור"]];
@@ -23,7 +25,7 @@ function toolHtml(x, i, n) {
 
 function formHtml(x) {
   x = x || {name: "", desc: "", url: "https://", icon: "fa-link", color: "blue"};
-  return '<form class="pform" id="tform">' + field("שם האפליקציה", '<input name="name" required maxlength="40" value="' + esc(x.name) + '">') +
+  return '<form class="pform" id="tform">' + field("שם האפליקציה (קצר - מופיע מתחת לאייקון)", '<input name="name" required maxlength="24" value="' + esc(x.name) + '">') +
     field("הסבר קצר (לא חובה)", '<input name="desc" maxlength="80" value="' + esc(x.desc || "") + '">') +
     field("קישור", '<input name="url" type="url" dir="ltr" required maxlength="300" value="' + esc(x.url) + '">') +
     '<fieldset class="aud"><legend>אייקון</legend>' + ICONS.map(ic => '<label class="pill picon"><input type="radio" name="icon" value="' + ic + '"' + (ic === x.icon ? " checked" : "") + '><span><i class="fa-solid ' + ic + '"></i></span></label>').join("") + "</fieldset>" +
@@ -36,9 +38,16 @@ export default {
   html() {
     if (S.staff == null) return '<div class="skel"><i></i><i></i><i></i></div>';
     const list = tools();
-    let h = '<div class="list">' + BUILTIN.map(x => '<a class="item tool" href="' + x.href + '"><div class="ico ' + x.color + '"><i class="fa-solid ' + x.icon + '"></i></div><div><b>' + x.name + "</b><span>" + x.desc + '</span></div><i class="fa-solid fa-chevron-left go"></i></a>').join("") + "</div>";
-    h += secHead("אפליקציות נוספות של בית החינוך") + '<p class="lead">כל אחת נפתחת בחלון חדש.</p>';
-    h += list.length ? '<div class="list">' + list.map((x, i) => toolHtml(x, i, list.length)).join("") + "</div>" : empty("עדיין אין כלים", isAdmin() ? "אפשר להוסיף את הראשון כאן למטה." : "ההנהלה תוסיף כאן אפליקציות בהמשך.", "fa-grip");
+    const icon = (href, ext, x) => '<a class="app" href="' + esc(href) + '"' + (ext ? ' target="_blank" rel="noopener"' : "") + (x.desc ? ' title="' + esc(x.desc) + '"' : "") +
+      '><span class="appicon ' + esc(x.color || "blue") + '"><i class="fa-solid ' + esc(x.icon || "fa-link") + '"></i>' + (ext ? '<i class="fa-solid fa-arrow-up-right-from-square ext" aria-label="נפתח בחלון חדש"></i>' : "") + '</span><span class="appname">' + esc(x.name) + "</span></a>";
+    let h;
+    if (!edit) {
+      h = '<div class="apps">' + BUILTIN.map(x => icon(x.href, false, x)).join("") + list.map(x => icon(x.url, true, x)).join("") + "</div>";
+      if (!list.length && !isAdmin()) h += '<p class="hint center">ההנהלה תוסיף כאן אפליקציות נוספות בהמשך.</p>';
+    } else {
+      h = '<p class="lead">האפליקציות החיצוניות: מסדרים, עורכים ומוסיפים. השינוי מופיע מיד אצל כל הצוות.</p>' +
+        (list.length ? '<div class="list">' + list.map((x, i) => toolHtml(x, i, list.length)).join("") + "</div>" : empty("עדיין אין אפליקציות חיצוניות", "אפשר להוסיף את הראשונה כאן למטה.", "fa-grip"));
+    }
     if (isAdmin()) {
       if (edit) h += editing ? '<div class="card">' + formHtml(list.find(x => x.id === editing)) + "</div>"
         : '<details class="add"><summary><i class="fa-solid fa-plus"></i> הוספת כלי</summary><div style="padding:0 1rem 1rem">' + formHtml() + "</div></details>";

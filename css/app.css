@@ -491,3 +491,17 @@ body:has(.ssel:not([hidden])) .view{padding-bottom:calc(var(--tabs) + 8rem + env
 .sadd button{min-height:2.75rem;padding:.4rem .85rem;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--navy-ink);font-size:.92rem;font-weight:600;cursor:pointer}
 .sadd button i{font-size:.75rem;margin-inline-end:.2rem}
 #sseatui{display:grid;gap:.8rem}
+
+/* מסך "כלים" כמו מסך הבית של הטלפון: רשת אייקונים, השם מתחת */
+.apps{display:grid;grid-template-columns:repeat(4,1fr);gap:1.4rem .4rem;padding:.8rem 0 1rem}
+.app{display:grid;justify-items:center;align-content:start;gap:.4rem;text-decoration:none;color:var(--ink);min-width:0;-webkit-tap-highlight-color:transparent}
+.appicon{--c:var(--i-blue);position:relative;width:3.9rem;height:3.9rem;border-radius:1.05rem;display:grid;place-items:center;color:#fff;font-size:1.6rem;
+  background:linear-gradient(160deg,color-mix(in srgb,var(--c) 75%,#fff),var(--c) 55%,color-mix(in srgb,var(--c) 82%,#000));
+  box-shadow:0 6px 14px -8px color-mix(in srgb,var(--c) 70%,#000),inset 0 1px 0 rgba(255,255,255,.25);transition:transform .15s var(--ease)}
+.app:active .appicon{transform:scale(.9)}
+.appicon .ext{position:absolute;bottom:.22rem;left:.22rem;font-size:.55rem;opacity:.85}
+.appicon.blue{--c:var(--i-blue)}.appicon.teal{--c:var(--i-teal)}.appicon.gold{--c:var(--i-gold)}.appicon.green{--c:var(--i-green)}.appicon.violet{--c:var(--i-violet)}.appicon.rose{--c:var(--i-red)}.appicon.slate{--c:var(--i-slate)}
+.appname{font-size:.84rem;font-weight:500;line-height:1.25;text-align:center;max-width:100%;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+@media (min-width:560px){.apps{grid-template-columns:repeat(5,1fr)}}
+.item.tool>div.tmove:not(.ico):not(.date){display:flex;flex:none;gap:.1rem}
+.ttl small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
