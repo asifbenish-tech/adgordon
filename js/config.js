@@ -24,6 +24,13 @@ export const PUSH_KEY = "BHr93LSQBTkb7Av1wAeSaFDkFjN0eYrNNQoGtkkh4tylPlXGRSjiP-s
 // ההפסקות (9:40, 11:30, 12:35) תואמות את לוח השמירות. לאמת מול לוח הצלצולים הרשמי ולתקן כאן אם צריך.
 export const BELLS = {1: ["08:10", "08:55"], 2: ["08:55", "09:40"], 3: ["10:00", "10:45"], 4: ["10:45", "11:30"], 5: ["11:50", "12:35"],
   6: ["12:55", "13:40"], 7: ["13:40", "14:25"], 8: ["14:25", "15:10"], 9: ["15:10", "15:55"]};
+// לשונית "כלים": אפליקציות נוספות של בית החינוך. ההנהלה עורכת את הרשימה באפליקציה (נשמר ב-meta/tools);
+// זו רק רשימת ההתחלה, עד שנערכת לראשונה.
+export const DEFAULT_TOOLS = [
+  {id: "tt", name: "לוח המערכות", desc: "מערכות השעות של כל הכיתות והמורים", url: "https://asifbenish-tech.github.io/gordon-timetable/", icon: "fa-table-cells", color: "blue"},
+  {id: "sg", name: "בית ספר גורדון", desc: "נוכחות, היעדרויות ובקשות חופשה", url: "https://school-gordon.web.app/", icon: "fa-school", color: "teal"},
+  {id: "portal", name: "פורטל המידע (באתר)", desc: "הפורטל המלא, כפי שהוא נפתח בדפדפן", url: "https://asifbenish-tech.github.io/gordon-staff/", icon: "fa-book-open", color: "gold"}
+];
 export const ID_SALT = "gordon-lohot-2026";   // אותו מלח כמו בלוח המערכות
 // מצב הדגמה: בלי שרת ובלי Firebase, נתוני דוגמה שנשמרים רק במכשיר.
 // פעיל כל עוד אין שרת כניסה, או עם ?demo=1 בכתובת.

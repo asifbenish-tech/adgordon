@@ -57,6 +57,8 @@ body.hero .aa{background:transparent;border-color:rgba(255,255,255,.5);color:#ff
 body.hero .mebtn .av{box-shadow:0 0 0 2px rgba(255,255,255,.7)}
 
 .view{max-width:720px;margin:0 auto;padding:1rem 1rem calc(var(--tabs) + 1.6rem + env(safe-area-inset-bottom,0px));display:grid;gap:.85rem;align-content:start}
+/* פריט ארוך (למשל שורת הודעה שלא נשברת) לא מרחיב את המסך הצידה */
+.view>*{min-width:0}
 body:not(.in) .tabs,body:not(.in) .aa{display:none}
 body:not(.in) .view{padding-top:6vh}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -371,3 +373,11 @@ a.item:active{background:var(--surface-2)}
 .ring{position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 999px rgba(0,0,0,.55);outline:2px solid #fff;outline-offset:-2px;pointer-events:none}
 .zoom{display:flex;align-items:center;gap:.8rem;color:var(--muted);padding-inline:.5rem}
 .zoom input{flex:1;accent-color:var(--navy)}
+
+/* ---- לשונית "כלים" ---- */
+.tool .ico{width:2.9rem;height:2.9rem;border-radius:.85rem;font-size:1.2rem}
+.tool b{font-size:1.06rem}
+.tmove{display:flex;gap:.1rem;flex:none}
+.tmove .del[disabled]{opacity:.3;cursor:default}
+.picon span{min-width:2.8rem;text-align:center;font-size:1rem}
+.picon input:checked+span::before{content:none}

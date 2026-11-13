@@ -2,7 +2,7 @@
 // המבנה ב-Firestore מתועד ב-INTEGRATION.md, וההרשאות ב-firestore.rules.
 import {S, changed} from "./state.js";
 import {watch, watchDoc, put, del} from "./store.js";
-import {DEFAULT_GROUPS, BUILTIN_GROUPS, TT_URL, EVENTS_URL, DEMO} from "./config.js";
+import {DEFAULT_TOOLS, DEFAULT_GROUPS, BUILTIN_GROUPS, TT_URL, EVENTS_URL, DEMO} from "./config.js";
 import {api, idToken} from "./auth.js";
 import {ls, today, uidOf, nameOf, rid, heSort, norm, iso, DAYN} from "./util.js";
 
@@ -127,7 +127,7 @@ export function startData() {
   S.duty = ls("adgDuty"); loadDuty(); loadSheet();
   watchDoc("staffAuth", S.user.uid, d => { S.myAuth = d || {}; changed(); });
   watch("photos", list => { S.photos = {}; for (const x of list || []) S.photos[x.id] = x.data; changed(); });
-  watch("meta", list => { S.groupsDoc = (list || []).find(x => x.id === "groups") || {}; after("groups"); });
+  watch("meta", list => { S.groupsDoc = (list || []).find(x => x.id === "groups") || {}; S.toolsDoc = (list || []).find(x => x.id === "tools") || {}; after("groups"); });
   watch("chats", list => { S.chats = (list || []).sort((a, b) => ((b.last || {}).at || 0) - ((a.last || {}).at || 0)); syncChat(); changed(); }, {has: ["members", S.user.uid]});
   syncChannels();
 }
@@ -262,6 +262,9 @@ export async function saveAuth(p, patch) {
 }
 // הסרה מהצוות: המסמך נשאר כ"מצבה" חסומה (off + removed), כדי שמכשיר שעדיין מחובר ייחסם מיד ולא יירשם מחדש
 export const removePerson = p => Promise.all([put("staff", p.uid, {name: p.name, groups: [], off: true, removed: true}), del("staffAuth", p.uid), del("photos", p.uid), del("push", p.uid)]);
+// ---- לשונית "כלים": קישורים לאפליקציות נוספות ----
+export const tools = () => (S.toolsDoc && Array.isArray(S.toolsDoc.list) ? S.toolsDoc.list : DEFAULT_TOOLS);
+export const saveTools = list => put("meta", "tools", {list});
 export const saveGroups = list => put("meta", "groups", {list});
 // הצעה ממערכת השעות: מחנכים -> "מחנכים" + הבית של הכיתה. רק מוסיף, לא מסיר.
 export function suggestGroups() {

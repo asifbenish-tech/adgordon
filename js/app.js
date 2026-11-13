@@ -15,10 +15,11 @@ import staff from "./views/staff.js";
 import profile from "./views/profile.js";
 import menu from "./views/menu.js";
 import {portal, bank} from "./views/portal.js";
+import tools from "./views/tools.js";
 
-const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: menu, edit: profile, portal, bank};
+const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: menu, edit: profile, portal, bank, tools};
 // המערכת והשמירות נמצאות באזור האישי (לחיצה על התמונה למעלה)
-const TABS = [["home", "היום", "fa-sun"], ["msg", "הודעות", "fa-comments"], ["cal", "אירועים", "fa-calendar-days"], ["portal", "מידע", "fa-book-open"]];
+const TABS = [["home", "היום", "fa-sun"], ["msg", "הודעות", "fa-comments"], ["cal", "אירועים", "fa-calendar-days"], ["portal", "מידע", "fa-book-open"], ["tools", "כלים", "fa-grip"]];
 let last = "";
 
 export const route = () => { const [name, arg] = location.hash.replace(/^#\/?/, "").split("/"); return {name: VIEWS[name] ? name : "home", arg: arg ? decodeURIComponent(arg) : ""}; };
