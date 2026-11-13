@@ -27,8 +27,8 @@ export const go = h => { if (location.hash === "#/" + h) render(true); else loca
 function render(force) {
   const el = $("view"), r = route(), v = VIEWS[r.name], key = r.name + "/" + r.arg;
   document.body.classList.toggle("in", !!S.user);
-  if (!S.ready) { el.innerHTML = '<p class="lead">טוען…</p>'; return; }
-  if (!S.user) { document.body.classList.remove("hero"); $("sub").textContent = "אפליקציית הצוות"; $("title").textContent = "בית חינוך א.ד. גורדון"; $("back").hidden = true; el.innerHTML = loginHtml(); bindLogin(); last = ""; return; }
+  if (!S.ready) { el.innerHTML = '<div class="skel" role="status" aria-label="טוען"><i></i><i></i><i></i></div>'; return; }
+  if (!S.user) { document.body.classList.remove("hero"); $("sub").textContent = "אפליקציית הצוות"; $("title").textContent = "בית חינוך א.ד. גורדון"; $("back").hidden = true; el.innerHTML = loginHtml(); bindLogin(); if (last !== "login") enter(el); last = "login"; return; }
   const tab = v.tab != null ? v.tab : r.name;
   for (const a of $("tabs").children) a.setAttribute("aria-current", a.dataset.t === tab ? "page" : "false");
   badge();
@@ -45,8 +45,11 @@ function render(force) {
   el.innerHTML = (DEMO ? '<div class="demo"><b>מצב הדגמה.</b> נתוני דוגמה שנשמרים רק במכשיר הזה.</div>' : "") +
     (S.err ? '<div class="err" role="alert">' + esc(S.err) + "</div>" : "") + v.html(r.arg);
   v.bind(el, r.arg);
-  if (!same) window.scrollTo(0, 0); else el.scrollTop = top;
+  if (!same) { window.scrollTo(0, 0); enter(el); } else el.scrollTop = top;
 }
+
+// כניסה מדורגת של המסך - רק כשעוברים מסך, לא בכל עדכון נתונים
+function enter(el) { el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); clearTimeout(enter.t); enter.t = setTimeout(() => el.classList.remove("enter"), 1000); }
 
 function badge() {
   const em = document.querySelector('#tabs a[data-t="msg"] em'), n = unreadBoard() + unreadChats() + unreadMgmt();

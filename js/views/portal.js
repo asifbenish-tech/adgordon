@@ -5,8 +5,10 @@ import {PORTAL_URL} from "../config.js";
 import {$, esc, ls, parse, today, MONTHS} from "../util.js";
 import {loading, empty, ui} from "../ui.js";
 
-const COLORS = {blue: "#2563eb", red: "#dc2626", emerald: "#059669", purple: "#9333ea", indigo: "#4f46e5", pink: "#db2777", cyan: "#0891b2", amber: "#d97706", yellow: "#ca8a04",
-  teal: "#0d9488", fuchsia: "#c026d3", slate: "#64748b", sky: "#0284c7", orange: "#ea580c", violet: "#7c3aed", rose: "#e11d48"};
+// צבעי הקטגוריות של הפורטל, מתורגמים לפלטה של האפליקציה (כחול דיו, זית, לבנה, זהב, ים)
+const NAVY = "#1c3557", OLIVE = "#5f6f2e", BRICK = "#a8432a", GOLD = "#b9801f", SEA = "#2f6f73";
+const COLORS = {blue: NAVY, red: BRICK, emerald: OLIVE, purple: NAVY, indigo: NAVY, pink: BRICK, cyan: SEA, amber: GOLD, yellow: GOLD,
+  teal: SEA, fuchsia: BRICK, slate: "#6b6557", sky: SEA, orange: GOLD, violet: NAVY, rose: BRICK};
 let q = "", asked = false;
 const abs = h => new URL(h, PORTAL_URL).href;
 const txt = (el, sel) => { const x = el.querySelector(sel); return x ? x.textContent.replace(/\s+/g, " ").trim() : ""; };
