@@ -23,7 +23,7 @@ Firestore של פרויקט `gordon-staff`. קוראים ממנו רק אנשי 
 | `push/<uid>` | `{name, duty:[{day, from, to, place}], tokens?:{אסימון FCM: זמן}}` | המכשיר של המשתמש |
 | `checkins/<תאריך>_<uid>_<שעה>` | `{uid, name, date, from, to, place, at}` - אישור הגעה לשמירה | האדם עצמו |
 | `photos/<uid>` | `{data: JPEG קטן כ-data URL, at}` | כל איש צוות, את שלו |
-| `seating/<uid>/classes/<cid>` | `{className, teacher, students:[...], layout, seats:[שם או null], nameMode, nameOrder, updated}` - סידור ישיבה | האדם עצמו בלבד (גם לא ההנהלה) |
+| `seating/<uid>/classes/<cid>` | `{className, teacher, students:[...], layout, room:{space, items}, seats:[שם או null], nameMode, nameOrder, updated}` - סידור ישיבה | האדם עצמו בלבד (גם לא ההנהלה) |
 | `meta/groups` | `{list:[{id, label}]}` | מסך ניהול הצוות |
 | `channels/<ערוץ>/msgs/<mid>` | `{mid, title, body, to:[...], by:<uid>, byName, at:<ms>}` | כל איש צוות |
 | `chats/<uidA__uidB>` + `msgs` | שיחות פרטיות | שני המשתתפים בלבד |

@@ -384,9 +384,11 @@ a.item:active{background:var(--surface-2)}
 
 /* ---- סידור ישיבה (#/seat) ---- */
 :root{--s-floor:#fbf6e9;--s-wall:#3d4a5c;--s-glass:#a9d3ee;--s-glass-ink:#2f6890;--s-board:#1d3a6b;--s-board-ink:#eef3fb;--s-wood:#a0622d;
-  --s-desk:#f6ecd6;--s-desk-line:#a48a57;--s-ink:#2a2416;--s-chair:#8fa9c9;--s-locker:#cfd9e6;--s-sel:#d9760f;--s-sel-soft:#fdeed9}
+  --s-desk:#f6ecd6;--s-desk-line:#a48a57;--s-ink:#2a2416;--s-chair:#8fa9c9;--s-locker:#cfd9e6;--s-sel:#d9760f;--s-sel-soft:#fdeed9;
+  --s-wood-f:#ead6b3;--s-wood-s:#8a6a3b;--s-blue-f:#d3e6f5;--s-blue-s:#4a7aa3;--s-gray-f:#e1e5ec;--s-gray-s:#5b6880;--s-green-f:#dcefdc;--s-green-s:#4f8a55}
 @media (prefers-color-scheme:dark){:root{--s-floor:#1c2433;--s-wall:#a3adbf;--s-glass:#3f7f9c;--s-glass-ink:#9fd0e6;--s-board:#2a4f8f;--s-board-ink:#eef3fb;--s-wood:#c98d4b;
-  --s-desk:#4a4130;--s-desk-line:#8d7a52;--s-ink:#f4ecd8;--s-chair:#4f6d93;--s-locker:#3a4a5f;--s-sel:#f0a04a;--s-sel-soft:#4a3519}}
+  --s-desk:#4a4130;--s-desk-line:#8d7a52;--s-ink:#f4ecd8;--s-chair:#4f6d93;--s-locker:#3a4a5f;--s-sel:#f0a04a;--s-sel-soft:#4a3519;
+  --s-wood-f:#5a4a33;--s-wood-s:#c9a571;--s-blue-f:#25435c;--s-blue-s:#7fb2da;--s-gray-f:#2c3547;--s-gray-s:#9aa6bb;--s-green-f:#24412b;--s-green-s:#7cc287}}
 body.wide .view,body.wide .bar-in{max-width:1080px}
 .scard{display:grid;gap:.8rem}
 .scard h3{display:flex;align-items:center;gap:.55rem;font-size:1.08rem;font-weight:700;color:var(--ink)}
@@ -418,14 +420,14 @@ details.scard[open] summary>i{transform:rotate(180deg)}
 .s-wall{fill:none;stroke:var(--s-wall);stroke-width:10;stroke-linecap:square}
 .s-win{fill:var(--s-glass);stroke:var(--s-wall);stroke-width:1.5}
 .s-winl{stroke:var(--s-wall);stroke-width:1}
-.s-wlabel{fill:var(--s-glass-ink);font-weight:700;font-size:19px;letter-spacing:.1em}
+.s-wlabel{fill:var(--s-glass-ink);font-weight:700;letter-spacing:.1em}
 .s-wood{fill:var(--s-wood)}
 .s-board{fill:var(--s-board)}
-.s-btext{fill:var(--s-board-ink);font-weight:600;font-size:24px;letter-spacing:.2em}
+.s-btext{fill:var(--s-board-ink);font-weight:600;letter-spacing:.2em}
 .s-leaf{stroke:var(--s-wood);stroke-width:7;stroke-linecap:round}
 .s-swing{fill:none;stroke:var(--muted);stroke-width:1.5;stroke-dasharray:5 5}
-.s-dlabel{fill:var(--ink);font-weight:700;font-size:16px}
-.s-label{fill:var(--muted);font-weight:700;font-size:17px}
+.s-dlabel{fill:var(--ink);font-weight:700}
+.s-label{fill:var(--muted);font-weight:700}
 .s-chair{fill:var(--s-chair)}
 .s-locker{fill:var(--s-locker);stroke:var(--s-wall);stroke-width:1.5}
 .s-handle{stroke:var(--s-wall);stroke-width:2.5;stroke-linecap:round}
@@ -454,6 +456,8 @@ details.scard[open] summary>i{transform:rotate(180deg)}
 .ssel span{font-size:.88rem;color:#d7e1f3}
 .ssel button{flex:none;min-width:2.75rem;height:2.75rem;padding:0 .8rem;border-radius:var(--r-sm);border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:#fff;font-weight:600;font-size:.94rem;cursor:pointer}
 @media (prefers-color-scheme:dark){.ssel{background:#2a4f8f}}
+/* כשהפס מוצג: מקום לגלול את סוף המפה אל מעליו */
+body:has(.ssel:not([hidden])) .view{padding-bottom:calc(var(--tabs) + 8rem + env(safe-area-inset-bottom,0px))}
 @media (max-width:600px){
   .scard .smap{margin-inline:-1rem;border-radius:0}
   .scard .two{grid-template-columns:1fr}
@@ -468,3 +472,22 @@ details.scard[open] summary>i{transform:rotate(180deg)}
   .sacts .btn{display:grid;justify-items:center;gap:.2rem;padding:.55rem .3rem;font-size:.88rem;line-height:1.25}
   .sacts .btn i{margin:0;font-size:1.05rem}
 }
+/* חדר: רהיטים, ועריכת החדר */
+.s-it{stroke-width:2}
+.s-it.wood{fill:var(--s-wood-f);stroke:var(--s-wood-s)}.s-it.blue{fill:var(--s-blue-f);stroke:var(--s-blue-s)}
+.s-it.gray{fill:var(--s-gray-f);stroke:var(--s-gray-s)}.s-it.green{fill:var(--s-green-f);stroke:var(--s-green-s);stroke-dasharray:8 6}
+.s-itext{fill:var(--ink);font-weight:600}
+.s-hit{fill:transparent;stroke:none}
+.sfloor:not(.edit) .s-obj{pointer-events:none}
+.sfloor.edit .s-desks{pointer-events:none;opacity:.6}
+.sfloor.edit .s-obj{cursor:grab;touch-action:none}
+.sfloor.edit .s-hit{stroke:var(--i-blue);stroke-width:2;stroke-dasharray:6 6}
+.sfloor.edit .s-obj.on .s-hit{stroke:var(--s-sel);stroke-width:5;stroke-dasharray:none;fill:var(--s-sel-soft);fill-opacity:.3}
+#smodes button i{margin-inline-end:.25rem}
+.sroom{display:grid;gap:.5rem;padding:.8rem;border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--line)}
+.sroom .lbl{font-size:.9rem;font-weight:600;color:var(--ink)}
+.sroom .link{justify-self:start;padding-inline:0}
+.sadd{display:flex;flex-wrap:wrap;gap:.4rem}
+.sadd button{min-height:2.75rem;padding:.4rem .85rem;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--navy-ink);font-size:.92rem;font-weight:600;cursor:pointer}
+.sadd button i{font-size:.75rem;margin-inline-end:.2rem}
+#sseatui{display:grid;gap:.8rem}

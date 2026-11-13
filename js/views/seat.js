@@ -6,6 +6,7 @@ import {$, esc, rid, ls} from "../util.js";
 import {startSeating, saveSeating, delSeating, myHome, myFull} from "../data.js";
 import {loading, field, ui} from "../ui.js";
 import {readNamesFile, jpegPdf} from "../seat-io.js";
+import {ADD, FREE, LONG, SIDES, label, defRoom, fixRoom, newItem, room, scene, moveItem, center, toSvg, toCanvas, svgEl as el} from "../seat-room.js";
 
 const EXAMPLE = ["נועה א׳", "איתי ב׳", "מאיה ג׳", "יונתן ד׳", "תמר ה׳", "אורי ו׳", "שירה ז׳", "עידו ח׳", "יעל ט׳", "דניאל י׳", "רוני כ׳", "עומר ל׳", "הילה מ׳",
   "גיא נ׳", "ליה ס׳", "אלון ע׳", "מיכל פ׳", "נדב צ׳", "עדי ק׳", "יובל ר׳", "אביגיל ש׳", "רועי ת׳", "טל א׳", "שחר ב׳", "ענבל ג׳", "אסף ד׳"];
@@ -13,17 +14,20 @@ const EX_NAME = "כיתה לדוגמה";
 const LAYOUT = {type: "cols", cols: 4, rows: 4, perCol: [4, 4, 4, 4], groups: 6, perGroup: 2, perRow: 3, uSide: 3, uBack: 4};
 const TYPES = [["cols", "טורים"], ["groups", "קבוצות"], ["u", "צורת ח׳"]];
 const clone = o => JSON.parse(JSON.stringify(o));
-const blank = () => ({id: "c" + rid(), className: "", teacher: "", students: [], layout: clone(LAYOUT), seats: [], nameMode: "short", nameOrder: "lf", example: false});
+const blank = () => ({id: "c" + rid(), className: "", teacher: "", students: [], layout: clone(LAYOUT), room: defRoom(), seats: [], nameMode: "short", nameOrder: "lf", example: false});
 
 // בטלפון: "big" = מקום ישיבה בגובה 44px לפחות והמפה נגללת הצידה; "fit" = כל הכיתה ברוחב המסך
 let zoom = ls("adgSeatZoom") || "big";
+// mode: "seats" = מזיזים תלמידים; "room" = עורכים את החדר (osel = הפריט שנבחר, drag = גרירה בתהליך)
+let mode = "seats", osel = null, drag = null, raf = 0;
 let rt = 0, C = null, sel = null, touched = false, saveT = 0, saving = false, again = false, status = {t: "", err: false}, preview = "";
 
 const saved = () => (S.seating || []).slice().sort((a, b) => (b.updated || 0) - (a.updated || 0));
 function load(d) {
   C = Object.assign(blank(), clone(d), {id: d.id, example: false});
   C.layout = Object.assign(clone(LAYOUT), C.layout);
-  sel = null; preview = "";
+  C.room = fixRoom(C.room);
+  sel = null; osel = null; preview = "";
 }
 function exampleClass() {
   C = blank(); C.className = EX_NAME; C.teacher = myFull(); C.students = EXAMPLE.slice(); C.nameOrder = "fl"; C.example = true; fillSeats(C.students);
@@ -45,7 +49,7 @@ function changed() {
   if (C.example) return;
   clearTimeout(saveT); saveT = setTimeout(save, 1000); setStatus("שומר…");
 }
-const snap = () => ({className: C.className, teacher: C.teacher, students: C.students.slice(), layout: clone(C.layout), seats: C.seats.slice(), nameMode: C.nameMode, nameOrder: C.nameOrder, updated: Date.now()});
+const snap = () => ({className: C.className, teacher: C.teacher, students: C.students.slice(), layout: clone(C.layout), room: clone(C.room), seats: C.seats.slice(), nameMode: C.nameMode, nameOrder: C.nameOrder, updated: Date.now()});
 async function save() {
   saveT = 0;
   if (saving) { again = true; return; }
@@ -91,18 +95,19 @@ function geometry(L) {
   let w = 0, h = 0; for (const d of desks.concat(chairs)) { w = Math.max(w, d.x + d.w); h = Math.max(h, d.y + d.h); }
   return {seats, desks, labels, chairs, w, h};
 }
-// החדר סביב השולחנות: הלוח בקיר הקדמי, הדלת מימין לו, חלונות לאורך הקיר השמאלי, לוקרים מאחור
-function room(g) {
-  let padL = 90, padR = 65; const padT = 125, padB = 100; let rw = g.w + padL + padR;
-  if (rw < 660) { const e = (660 - rw) / 2; padL += e; padR += e; rw = 660; }
-  const x0 = -padL, y0 = -padT, x1 = g.w + padR, y1 = g.h + padB;
-  const bw = Math.min(rw * .5, rw - 260), bcx = (x0 + x1) / 2;
-  const wins = [], top = y0 + 55, len = (y1 - 35) - top, n = Math.max(2, Math.round(len / 200)), wl = (len - (n - 1) * 28) / n;
-  for (let i = 0; i < n; i++) wins.push({y: top + i * (wl + 28), h: wl});
-  const ln = Math.max(4, Math.round((rw - 90) / 48)), lw = (rw - 90) / ln, lockers = [];
-  for (let i = 0; i < ln; i++) lockers.push({x: x0 + 45 + i * lw, y: y1 - 39, w: lw, h: 33});
-  return {x0, y0, x1, y1, w: rw, h: y1 - y0, board: {x: bcx - bw / 2, y: y0 + 5, w: bw, h: 44}, door: {t: y0 + 28, r: 85}, lockers, wins};
+// השולחנות, הכיסאות ושמות הקבוצות כצורות של הסצנה (seat-room.js), למסך ולהדפסה
+function deskPrims(g) {
+  const P = [];
+  for (const l of g.labels) P.push({t: "text", x: l.x, y: l.y, s: l.text, c: "s-label", sz: 17});
+  for (const c of g.chairs) P.push({t: "rect", x: c.x, y: c.y, w: c.w, h: c.h, rx: 6, c: "s-chair"});
+  for (const d of g.desks) {
+    P.push({t: "rect", x: d.x, y: d.y, w: d.w, h: d.h, rx: 8, c: "s-desk"});
+    P.push(d.split === "v" ? {t: "line", x1: d.x + 100, y1: d.y + 6, x2: d.x + 100, y2: d.y + d.h - 6, c: "s-split"} : {t: "line", x1: d.x + 6, y1: d.y + 60, x2: d.x + d.w - 6, y2: d.y + 60, c: "s-split"});
+  }
+  return [{prims: P}];
 }
+const curRoom = () => room(geometry(C.layout), C.room.space);
+const itemOf = id => C.room.items.find(it => it.id === id);
 // איך השם מופיע על השולחן. "short" = שם פרטי + אותיות מהמשפחה, כמה שצריך כדי שלא יהיו שני שמות זהים
 function displayMap() {
   const mode = C.nameMode || "short", m = new Map();
@@ -154,12 +159,12 @@ function fillSeats(list) { const cap = capacity(); C.seats = []; for (let i = 0;
 const reflow = () => fillSeats(C.seats.filter(Boolean));
 
 // ---- המפה (SVG) ----
-const NS = "http://www.w3.org/2000/svg";
-function el(tag, attrs, text) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; }
 function renderPlan() {
   const svg = $("splan"); if (!svg) return;
   normalizeSeats();
-  const g = geometry(C.layout), R = room(g), dm = displayMap(), fl = $("sfloor");
+  const g = geometry(C.layout), R = room(g, C.room.space), dm = displayMap(), fl = $("sfloor"), sc = scene(R, C.room.items);
+  if (osel && !itemOf(osel)) osel = null;
+  fl.classList.toggle("edit", mode === "room");
   svg.textContent = "";
   svg.setAttribute("viewBox", (R.x0 - 10) + " " + (R.y0 - 10) + " " + (R.w + 20) + " " + (R.h + 20));
   // מסך צר (טלפון): אפשר לבחור בין "כל הכיתה" (קטן) ל"מוגדל" (קריא, נגלל הצידה). מסך רחב: תמיד כל הכיתה
@@ -169,28 +174,8 @@ function renderPlan() {
   $("szhint").hidden = !big;
   fl.style.minWidth = big ? need + "px" : "0";
   fl.style.maxWidth = Math.round(R.w * 1.1) + "px";
-  svg.appendChild(el("rect", {x: R.x0, y: R.y0, width: R.w, height: R.h, class: "s-floor"}));
-  svg.appendChild(el("path", {d: "M" + R.x1 + " " + R.door.t + "V" + R.y0 + "H" + R.x0 + "V" + R.y1 + "H" + R.x1 + "V" + (R.door.t + R.door.r), class: "s-wall"}));
-  for (const l of R.lockers) { svg.appendChild(el("rect", {x: l.x, y: l.y, width: l.w, height: l.h, rx: 3, class: "s-locker"})); svg.appendChild(el("line", {x1: l.x + l.w - 9, y1: l.y + 11, x2: l.x + l.w - 9, y2: l.y + 22, class: "s-handle"})); }
-  svg.appendChild(el("text", {x: (R.x0 + R.x1) / 2, y: R.y1 - 50, "text-anchor": "middle", class: "s-label"}, "לוקרים"));
-  for (const w of R.wins) { svg.appendChild(el("rect", {x: R.x0 - 8, y: w.y, width: 16, height: w.h, class: "s-win"})); svg.appendChild(el("line", {x1: R.x0, y1: w.y, x2: R.x0, y2: w.y + w.h, class: "s-winl"})); }
-  const wy = (R.y0 + R.y1) / 2 + 10;
-  svg.appendChild(el("text", {x: R.x0 + 34, y: wy, "text-anchor": "middle", class: "s-wlabel", transform: "rotate(-90 " + (R.x0 + 34) + " " + wy + ")"}, "חלונות"));
-  const B = R.board;
-  svg.appendChild(el("rect", {x: B.x - 5, y: B.y, width: B.w + 10, height: B.h + 5, rx: 4, class: "s-wood"}));
-  svg.appendChild(el("rect", {x: B.x, y: B.y + 5, width: B.w, height: B.h - 5, rx: 2, class: "s-board"}));
-  svg.appendChild(el("text", {x: B.x + B.w / 2, y: B.y + B.h / 2 + 4, "text-anchor": "middle", "dominant-baseline": "central", class: "s-btext"}, "הלוח"));
-  const D = R.door;
-  svg.appendChild(el("path", {d: "M" + R.x1 + " " + (D.t + D.r) + "A" + D.r + " " + D.r + " 0 0 1 " + (R.x1 - D.r) + " " + D.t, class: "s-swing"}));
-  svg.appendChild(el("line", {x1: R.x1, y1: D.t, x2: R.x1 - D.r, y2: D.t, class: "s-leaf"}));
-  svg.appendChild(el("text", {x: R.x1 - 34, y: D.t + 30, "text-anchor": "middle", class: "s-dlabel"}, "דלת"));
-  svg.appendChild(el("text", {x: R.x1 - 34, y: D.t + 49, "text-anchor": "middle", class: "s-dlabel"}, "הכניסה"));
-  for (const l of g.labels) svg.appendChild(el("text", {x: l.x, y: l.y, "text-anchor": "middle", class: "s-label"}, l.text));
-  for (const c of g.chairs) svg.appendChild(el("rect", {x: c.x, y: c.y, width: c.w, height: c.h, rx: 6, class: "s-chair"}));
-  for (const d of g.desks) {
-    svg.appendChild(el("rect", {x: d.x, y: d.y, width: d.w, height: d.h, rx: 8, class: "s-desk"}));
-    svg.appendChild(d.split === "v" ? el("line", {x1: d.x + 100, y1: d.y + 6, x2: d.x + 100, y2: d.y + d.h - 6, class: "s-split"}) : el("line", {x1: d.x + 6, y1: d.y + 60, x2: d.x + d.w - 6, y2: d.y + 60, class: "s-split"}));
-  }
+  toSvg(svg, sc.under, osel);
+  const dk = el("g", {class: "s-desks"}); toSvg(dk, deskPrims(g)); svg.appendChild(dk);
   g.seats.forEach((s, i) => {
     const name = C.seats[i], on = sel && sel.t === "seat" && sel.i === i;
     const grp = el("g", {class: "s-seat" + (on ? " sel" : ""), tabindex: 0, role: "button", "aria-pressed": on, "aria-label": (name || "מקום פנוי") + (on ? " (נבחר)" : "")});
@@ -201,13 +186,15 @@ function renderPlan() {
     } else grp.appendChild(el("text", {x: s.x + 50, y: s.y + 30, "text-anchor": "middle", "dominant-baseline": "central", "font-size": 14, class: "s-empty"}, "פנוי"));
     grp.addEventListener("click", () => clickSeat(i));
     grp.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); clickSeat(i); } });
-    svg.appendChild(grp);
+    dk.appendChild(grp);
   });
+  toSvg(svg, sc.over, osel);
   renderPool(); renderCount(); renderSel();
 }
 // פס קבוע בתחתית בזמן שמשהו נבחר: מה נבחר, מה עושים עכשיו, הוצאה מהמקום וביטול. בטלפון המפה והרשימה רחוקות זו מזו.
 function renderSel() {
   const b = $("ssel"); if (!b) return;
+  if (mode === "room") return roomSel(b);
   b.hidden = !sel; if (!sel) return;
   const name = sel.t === "pool" ? sel.name : C.seats[sel.i];
   const what = sel.t === "pool" ? "לוחצים על מקום במפה כדי להושיב" : name ? "לוחצים על מקום אחר כדי להעביר או להחליף" : unseated().length ? "לוחצים על תלמיד מהממתינים כדי להושיב כאן" : "לוחצים על תלמיד במפה כדי להעביר אותו לכאן";
@@ -215,6 +202,60 @@ function renderSel() {
     (sel.t === "seat" && name ? '<button type="button" id="sselout">הוצאה</button>' : "") + '<button type="button" id="sselx" aria-label="ביטול הבחירה"><i class="fa-solid fa-xmark"></i></button>';
   const o = $("sselout"); if (o) o.onclick = () => { C.seats[sel.i] = null; sel = null; changed(); renderPlan(); };
   $("sselx").onclick = () => { sel = null; renderPlan(); };
+}
+function roomSel(b) {
+  const it = osel && itemOf(osel);
+  b.hidden = !it; if (!it) return;
+  const btn = (id, txt, aria) => '<button type="button" id="' + id + '"' + (aria ? ' aria-label="' + aria + '"' : "") + ">" + txt + "</button>";
+  b.innerHTML = '<i class="fa-solid fa-up-down-left-right"></i><div><b>' + esc(label(it)) + "</b><span>" + (FREE[it.type] ? "לוחצים במפה על המקום החדש, או גוררים" : "לוחצים ליד הקיר החדש, או גוררים") + "</span></div>" +
+    (LONG.includes(it.type) ? btn("sishort", "קצר", "קיצור") + btn("silong", "ארוך", "הארכה") : "") + (FREE[it.type] ? btn("sirot", '<i class="fa-solid fa-rotate"></i>', "סיבוב") : "") +
+    btn("sidel", '<i class="fa-solid fa-trash-can"></i>', "מחיקה מהחדר") + btn("sselx", '<i class="fa-solid fa-xmark"></i>', "סיום הבחירה");
+  const len = d => () => { it.len = Math.round(Math.max(.15, Math.min(.95, (it.len || .5) + d)) * 100) / 100; changed(); renderPlan(); };
+  if ($("sishort")) { $("sishort").onclick = len(-.1); $("silong").onclick = len(.1); }
+  if ($("sirot")) $("sirot").onclick = () => { const R = curRoom(), [x, y] = center(R, it); it.rot = !it.rot; moveItem(R, it, x, y); changed(); renderPlan(); };
+  $("sidel").onclick = () => { C.room.items = C.room.items.filter(x => x !== it); osel = null; changed(); renderPlan(); };
+  $("sselx").onclick = () => { osel = null; renderPlan(); };
+}
+// ---- עריכת החדר: לחיצה על פריט בוחרת אותו, לחיצה על המפה מזיזה אותו לשם, ואפשר גם לגרור ----
+function svgPt(e) { const svg = $("splan"), p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); }
+function onDown(e) {
+  if (mode !== "room" || drag || (e.button != null && e.button > 0)) return;
+  const t = e.target.closest && e.target.closest("[data-id]"), it = t && itemOf(t.dataset.id);
+  drag = {id: it ? it.id : null, x: e.clientX, y: e.clientY, moved: false, pid: e.pointerId, off: [0, 0]};
+  if (it) {
+    e.preventDefault();
+    if (FREE[it.type]) { const p = svgPt(e), c = center(curRoom(), it); drag.off = [c[0] - p.x, c[1] - p.y]; }
+  }
+  addEventListener("pointermove", onMove); addEventListener("pointerup", onUp); addEventListener("pointercancel", endDrag);
+}
+function onMove(e) {
+  if (!drag || e.pointerId !== drag.pid) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return;
+  drag.moved = true;
+  if (!drag.id) return;   // גלילה של המפה, לא גרירה
+  osel = drag.id;
+  const p = svgPt(e); moveItem(curRoom(), itemOf(drag.id), p.x + drag.off[0], p.y + drag.off[1]);
+  if (!raf) raf = requestAnimationFrame(() => { raf = 0; renderPlan(); });
+}
+function onUp(e) {
+  if (!drag || e.pointerId !== drag.pid) return;
+  const d = drag;
+  if (d.id) { if (d.moved) changed(); else osel = osel === d.id ? null : d.id; }
+  else if (!d.moved && osel && itemOf(osel)) { const p = svgPt(e); moveItem(curRoom(), itemOf(osel), p.x, p.y); changed(); }
+  endDrag(); renderPlan();
+}
+function endDrag() { drag = null; removeEventListener("pointermove", onMove); removeEventListener("pointerup", onUp); removeEventListener("pointercancel", endDrag); }
+function setMode(m) {
+  mode = m; sel = null; osel = null;
+  for (const b of document.querySelectorAll("#smodes button")) b.setAttribute("aria-pressed", b.dataset.m === m);
+  $("sroom").hidden = m !== "room"; $("sseatui").hidden = m === "room";
+  $("smaphint").textContent = m === "room" ? "לוחצים על הלוח, הדלת, הלוקרים, החלונות או רהיט, ואז על המקום החדש במפה (או גוררים). פריטי קיר נצמדים לקיר הקרוב." : "לוחצים על תלמיד ואז על מקום אחר כדי להעביר או להחליף.";
+  renderPlan();
+}
+function renderSpace() {
+  const box = $("sspace"); if (!box) return;
+  box.textContent = "";
+  for (const [k, t] of SIDES) box.appendChild(stepper(t, 0, 8, () => C.room.space[k] || 0, v => { C.room.space[k] = v; }, () => { changed(); renderPlan(); }));
 }
 function renderPool() {
   const p = $("spool"); if (!p) return;
@@ -246,12 +287,12 @@ function clickPool(name, idx) {
 }
 
 // ---- צורת הכיתה ----
-function stepper(label, min, max, get, set) {
+function stepper(label, min, max, get, set, after) {
   const w = document.createElement("div"), l = document.createElement("span"), c = document.createElement("div");
   l.className = "lbl"; l.textContent = label; c.className = "ctl";
   const mk = (txt, aria, d) => { const b = document.createElement("button"); b.type = "button"; b.textContent = txt; b.setAttribute("aria-label", label + ": " + aria); b.onclick = () => go(d); return b; };
   const o = document.createElement("output"); o.textContent = get();
-  const go = d => { const v = Math.min(max, Math.max(min, get() + d)); if (v !== get()) { set(v); o.textContent = v; shapeChanged(); } };
+  const go = d => { const v = Math.min(max, Math.max(min, get() + d)); if (v !== get()) { set(v); o.textContent = v; (after || shapeChanged)(); } };
   c.append(mk("+", "יותר", 1), o, mk("−", "פחות", -1)); w.append(l, c);
   return w;
 }
@@ -291,7 +332,7 @@ function rr(x, a, b, w, h, r) { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w
 async function buildSheet() {
   try { await Promise.all([document.fonts.load("600 40px Rubik", "אב"), document.fonts.load("700 40px Rubik", "אב")]); } catch (e) {}
   normalizeSeats();
-  const g = geometry(C.layout), R = room(g), dm = displayMap(), M = 80;
+  const g = geometry(C.layout), R = room(g, C.room.space), dm = displayMap(), M = 80;
   const dims = land => { const W = land ? 2480 : 1754, H = land ? 1754 : 2480, f = land ? 1 : .74, head = Math.round(320 * f), top = head + 110; return {W, H, land, f, head, top, k: Math.min((W - 2 * M) / R.w, (H - top - M - 40) / R.h, 3.2)}; };
   const a = dims(true), b = dims(false), P = b.k > a.k * 1.08 ? b : a, {W, H, k, f, head, top} = P;
   const c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d");
@@ -313,36 +354,15 @@ async function buildSheet() {
   if (cls) { x.font = "700 " + 92 * f + "px " + FAM; const pw = x.measureText(cls).width + 110 * f, ph = 150 * f, py = head * .14;
     x.fillStyle = "#f2b33d"; rr(x, M, py, pw, ph, ph / 2); x.fill(); x.fillStyle = "#141a26"; x.textAlign = "center"; x.fillText(cls, M + pw / 2, py + ph / 2 + 4 * f); x.textAlign = "left"; }
   if (C.teacher.trim()) { x.fillStyle = "#fff"; x.font = "500 " + 44 * f + "px " + FAM; x.fillText("מחנך/ת: " + C.teacher.trim(), M, cls ? head * .8 : head * .5); }
-  // החדר
+  // החדר והשולחנות: אותה סצנה כמו במסך
   const ox = (W - R.w * k) / 2 - R.x0 * k, oy = top + Math.max(0, (H - top - M - 40 - R.h * k) / 2) - R.y0 * k, X = v => ox + v * k, Y = v => oy + v * k;
-  x.fillStyle = "#fbf6e9"; x.fillRect(X(R.x0), Y(R.y0), R.w * k, R.h * k);
-  x.strokeStyle = "#3d4a5c"; x.lineWidth = 11 * k; x.lineCap = "square"; x.lineJoin = "miter";
-  x.beginPath(); x.moveTo(X(R.x1), Y(R.door.t)); x.lineTo(X(R.x1), Y(R.y0)); x.lineTo(X(R.x0), Y(R.y0)); x.lineTo(X(R.x0), Y(R.y1)); x.lineTo(X(R.x1), Y(R.y1)); x.lineTo(X(R.x1), Y(R.door.t + R.door.r)); x.stroke();
-  for (const l of R.lockers) { x.fillStyle = "#cfd9e6"; x.strokeStyle = "#3d4a5c"; x.lineWidth = 1.6 * k; rr(x, X(l.x), Y(l.y), l.w * k, l.h * k, 3 * k); x.fill(); x.stroke(); x.lineWidth = 2.6 * k; x.lineCap = "round"; x.beginPath(); x.moveTo(X(l.x + l.w - 9), Y(l.y + 11)); x.lineTo(X(l.x + l.w - 9), Y(l.y + 22)); x.stroke(); }
-  x.fillStyle = "#566072"; x.textAlign = "center"; x.font = "600 " + 19 * k + "px " + FAM; x.fillText("לוקרים", X((R.x0 + R.x1) / 2), Y(R.y1 - 55));
-  for (const w of R.wins) { x.fillStyle = "#a9d3ee"; x.strokeStyle = "#3d4a5c"; x.lineWidth = 1.6 * k; x.lineCap = "butt"; x.fillRect(X(R.x0 - 9), Y(w.y), 18 * k, w.h * k); x.strokeRect(X(R.x0 - 9), Y(w.y), 18 * k, w.h * k); x.beginPath(); x.moveTo(X(R.x0), Y(w.y)); x.lineTo(X(R.x0), Y(w.y + w.h)); x.stroke(); }
-  x.save(); x.translate(X(R.x0 + 36), Y((R.y0 + R.y1) / 2 + 10)); x.rotate(-Math.PI / 2); x.textAlign = "center"; x.fillStyle = "#2f6890"; x.font = "600 " + 22 * k + "px " + FAM; x.fillText("חלונות", 0, 0); x.restore();
-  const B = R.board;
-  x.fillStyle = "#a0622d"; rr(x, X(B.x - 6), Y(B.y), (B.w + 12) * k, (B.h + 6) * k, 4 * k); x.fill();
-  x.fillStyle = "#1d3a6b"; rr(x, X(B.x), Y(B.y + 5), B.w * k, (B.h - 5) * k, 2 * k); x.fill();
-  x.fillStyle = "#eef3fb"; x.textAlign = "center"; x.font = "600 " + 26 * k + "px " + FAM; x.fillText("ה ל ו ח", X(B.x + B.w / 2), Y(B.y + B.h / 2 + 4));
-  const D = R.door;
-  x.strokeStyle = "#8c96a3"; x.lineWidth = 1.6 * k; x.lineCap = "butt"; x.setLineDash([6 * k, 6 * k]); x.beginPath(); x.arc(X(R.x1), Y(D.t), D.r * k, Math.PI / 2, Math.PI); x.stroke(); x.setLineDash([]);
-  x.strokeStyle = "#a0622d"; x.lineWidth = 8 * k; x.lineCap = "round"; x.beginPath(); x.moveTo(X(R.x1), Y(D.t)); x.lineTo(X(R.x1 - D.r), Y(D.t)); x.stroke();
-  x.fillStyle = "#2a3142"; x.textAlign = "center"; x.font = "600 " + 17 * k + "px " + FAM; x.fillText("דלת", X(R.x1 - 34), Y(D.t + 25)); x.fillText("הכניסה", X(R.x1 - 34), Y(D.t + 45));
-  // השולחנות
-  x.fillStyle = "#566072"; x.font = "600 " + 18 * k + "px " + FAM; for (const l of g.labels) x.fillText(l.text, X(l.x), Y(l.y - 6));
-  x.fillStyle = "#8fa9c9"; for (const ch of g.chairs) { rr(x, X(ch.x), Y(ch.y), ch.w * k, ch.h * k, 6 * k); x.fill(); }
-  for (const d of g.desks) {
-    x.fillStyle = "rgba(60,45,20,.16)"; rr(x, X(d.x + 3), Y(d.y + 4), d.w * k, d.h * k, 9 * k); x.fill();
-    x.fillStyle = "#f6e2b6"; x.strokeStyle = "#a67c3d"; x.lineWidth = 2.2 * k; rr(x, X(d.x), Y(d.y), d.w * k, d.h * k, 9 * k); x.fill(); x.stroke();
-    x.lineWidth = k; x.lineCap = "butt"; x.setLineDash([5 * k, 5 * k]); x.beginPath();
-    if (d.split === "v") { x.moveTo(X(d.x + 100), Y(d.y + 7)); x.lineTo(X(d.x + 100), Y(d.y + d.h - 7)); } else { x.moveTo(X(d.x + 7), Y(d.y + 60)); x.lineTo(X(d.x + d.w - 7), Y(d.y + 60)); }
-    x.stroke(); x.setLineDash([]);
-  }
+  const sc = scene(R, C.room.items);
+  toCanvas(x, sc.under, X, Y, k, FAM); toCanvas(x, deskPrims(g), X, Y, k, FAM);
+  x.textAlign = "center"; x.textBaseline = "middle";
   x.fillStyle = "#141a26";
   g.seats.forEach((s, i) => { const nm = C.seats[i]; if (!nm) return; const fi = fit(dm.get(nm) || nm), lh = fi.size * 1.12, y0 = s.y + 31 - (fi.lines.length - 1) * lh / 2;
     x.font = "600 " + (fi.size * k) + "px " + FAM; fi.lines.forEach((ln, j) => x.fillText(ln, X(s.x + 50), Y(y0 + j * lh))); });
+  toCanvas(x, sc.over, X, Y, k, FAM);
   x.fillStyle = "#566072"; x.font = "500 30px " + FAM; x.textAlign = "center"; x.fillText("עודכן בתאריך " + new Date().toLocaleDateString("he-IL"), W / 2, H - 48);
   return {canvas: c, land: P.land};
 }
@@ -410,21 +430,35 @@ export default {
         '<div class="two">' + field("איך השמות כתובים ברשימה", '<select id="sorder">' + opt("lf", "שם משפחה ואז שם פרטי", C.nameOrder) + opt("fl", "שם פרטי ואז שם משפחה", C.nameOrder) + "</select>") +
         field("איך השם מופיע על השולחן", '<select id="smode">' + opt("short", "שם פרטי + אות מהמשפחה", C.nameMode) + opt("first", "שם פרטי בלבד", C.nameMode) + opt("full", "שם מלא", C.nameMode) + "</select>") + "</div>", setup) +
       card(4, "מפת הכיתה",
-        '<p class="hint">לוחצים על תלמיד ואז על מקום אחר כדי להעביר או להחליף. הדלת בקיר הימני, החלונות משמאל והלוקרים מאחור.</p>' +
+        '<div class="seg" id="smodes" role="group" aria-label="מה מזיזים">' + [["seats", "הזזת תלמידים", "fa-user-group"], ["room", "עריכת החדר", "fa-pen-ruler"]].map(m => '<button type="button" data-m="' + m[0] + '" aria-pressed="' + (mode === m[0]) + '"><i class="fa-solid ' + m[2] + '"></i> ' + m[1] + "</button>").join("") + "</div>" +
+        '<p class="hint" id="smaphint"></p>' +
+        '<div class="sroom" id="sroom" hidden><span class="lbl">הוספה לכיתה</span><div class="sadd">' +
+        ADD.map(t => '<button type="button" data-add="' + t + '"><i class="fa-solid fa-plus"></i> ' + esc(label({type: t})) + "</button>").join("") + "</div>" +
+        '<span class="lbl">עוד מקום בחדר (אם רהיט לא נכנס)</span><div class="stp" id="sspace"></div>' +
+        '<button type="button" class="link" id="sroomreset">החזרת החדר לסידור ההתחלתי</button></div>' +
         '<div class="seg szoom" id="szoom" role="group" aria-label="גודל המפה" hidden><button type="button" data-z="big">מוגדל</button><button type="button" data-z="fit">כל הכיתה</button></div>' +
         '<p class="hint" id="szhint" hidden><i class="fa-solid fa-arrows-left-right"></i>גוללים הצידה כדי לראות את כל הכיתה.</p>' +
         '<div class="smap" id="smap"><div class="sfloor" id="sfloor"><svg id="splan" role="group" aria-label="מפת הכיתה"></svg></div></div>' +
-        '<div class="spool"><span class="lbl">ממתינים לשיבוץ</span><div id="spool"></div></div>' +
+        '<div id="sseatui"><div class="spool"><span class="lbl">ממתינים לשיבוץ</span><div id="spool"></div></div>' +
         '<div class="srow sacts">' + '<button type="button" class="btn ghost small" id="sord"><i class="fa-solid fa-arrow-down-1-9"></i> שיבוץ לפי הסדר</button>' +
         '<button type="button" class="btn ghost small" id="srand"><i class="fa-solid fa-shuffle"></i> שיבוץ אקראי</button>' +
-        '<button type="button" class="btn ghost small" id="sclear"><i class="fa-solid fa-eraser"></i> ריקון המקומות</button></div>' +
+        '<button type="button" class="btn ghost small" id="sclear"><i class="fa-solid fa-eraser"></i> ריקון המקומות</button></div></div>' +
         '<button type="button" class="btn" id="spdf"><i class="fa-solid fa-print"></i> הורדת דף להדפסה (PDF)</button><p id="spdfst" class="hint" aria-live="polite"></p>' +
         '<div class="sprev" id="sprev"' + (preview ? "" : " hidden") + '><p class="hint">כך ייראה הדף. אם ההורדה לא נפתחה, לחיצה ארוכה על התמונה שומרת אותה להדפסה.</p><img id="sprevimg" alt="תצוגת הדף להדפסה" src="' + esc(preview) + '"></div>') +
       '<div class="ssel" id="ssel" role="status" hidden></div>';
   },
   bind() {
     if (!$("splan")) return;
-    renderShape(); renderPlan();
+    renderShape(); renderSpace(); setMode(mode);
+    for (const b of document.querySelectorAll("#smodes button")) b.onclick = () => setMode(b.dataset.m);
+    $("splan").addEventListener("pointerdown", onDown);
+    for (const b of document.querySelectorAll("[data-add]")) b.onclick = () => {
+      const t = b.dataset.add, it = newItem(t, "i" + rid());
+      if (t === "other") { const n = (prompt("מה זה? (למשל: עמדת מורה, מקרן, פינת משחק)") || "").trim().slice(0, 30); if (!n) return; it.name = n; }
+      C.room.items.push(it); osel = it.id; changed(); renderPlan();
+      $("smap").scrollIntoView({block: "center", behavior: "smooth"});   // שהמפה לא תהיה מוסתרת מתחת לפס הבחירה
+    };
+    $("sroomreset").onclick = () => { if (confirm("להחזיר את הלוח, הדלת, הלוקרים והחלונות למקום ההתחלתי ולמחוק את הרהיטים שנוספו?")) { C.room = defRoom(); osel = null; changed(); renderSpace(); renderPlan(); } };
     for (const b of document.querySelectorAll("#szoom button")) b.onclick = () => { zoom = b.dataset.z; ls("adgSeatZoom", zoom); renderPlan(); };
     // סיבוב הטלפון / שינוי גודל חלון: הרוחב הזמין משתנה
     window.onresize = () => { clearTimeout(rt); rt = setTimeout(() => { if ($("splan")) renderPlan(); }, 200); };
@@ -433,7 +467,7 @@ export default {
       flush();
       if (e.target.value === "__new") { C = blank(); C.teacher = myFull(); C.className = saved().length ? "" : myHome(); touched = true; }
       else { const d = saved().find(x => x.id === e.target.value); if (d) load(d); }
-      setStatus(""); ui.render();
+      setStatus(""); mode = "seats"; ui.render();
       if (e.target.value === "__new") $("scls").focus();
     };
     $("sdel").onclick = () => {

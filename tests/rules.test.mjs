@@ -143,6 +143,8 @@ await t("cannot read another's seating", no(getDocs(collection(T2, "seating/t_on
 await t("admin cannot read seating", no(getDoc(doc(A, "seating/t_one/classes/c1"))));
 await t("cannot write another's seating", no(setDoc(doc(T2, "seating/t_one/classes/c2"), seat)));
 await t("cannot delete another's seating", no(deleteDoc(doc(A, "seating/t_one/classes/c1"))));
+await t("save seating with room", ok(setDoc(doc(T1, "seating/t_one/classes/c4"), {...seat, room: {space: {t: 1, b: 0, l: 0, r: 0}, items: [{id: "board", type: "board", wall: "r", at: .5, len: .5}, {id: "i1", type: "tdesk", fx: .5, fy: .2}]}})));
+await t("seating room with too many items refused", no(setDoc(doc(T1, "seating/t_one/classes/c5"), {...seat, room: {space: {}, items: Array(41).fill({type: "pillar"})}})));
 await t("seating extra field refused", no(setDoc(doc(T1, "seating/t_one/classes/c3"), {...seat, evil: 1})));
 await t("seating huge list refused", no(setDoc(doc(T1, "seating/t_one/classes/c3"), {...seat, students: Array(81).fill("x")})));
 await t("blocked cannot save seating", no(setDoc(doc(B, "seating/t_blocked/classes/c1"), seat)));
