@@ -60,6 +60,15 @@ service cloud.firestore {
         && request.resource.data.date is string && request.resource.data.from is string
         && id == request.resource.data.date + '_' + request.auth.uid + '_' + request.resource.data.from;
     }
+    // סידור ישיבה: כל איש צוות שומר את הכיתות שלו. רק הוא קורא וכותב - יש בהן שמות תלמידים, ולכן גם לא ההנהלה.
+    match /seating/{uid}/classes/{cid} {
+      allow read, delete: if staff() && uid == request.auth.uid;
+      allow create, update: if staff() && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['className', 'teacher', 'students', 'layout', 'seats', 'nameMode', 'nameOrder', 'updated'])
+        && request.resource.data.students is list && request.resource.data.students.size() <= 80
+        && request.resource.data.seats is list && request.resource.data.seats.size() <= 200
+        && request.resource.data.className is string && request.resource.data.className.size() <= 60;
+    }
     match /meta/{id}   { allow read: if staff(); allow write: if admin(); }
     match /duties/{id} { allow read: if staff(); allow write: if admin(); }
     match /events/{id} { allow read: if staff(); allow write: if admin(); }

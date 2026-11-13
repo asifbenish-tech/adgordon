@@ -263,6 +263,17 @@ export async function saveAuth(p, patch) {
 // הסרה מהצוות: המסמך נשאר כ"מצבה" חסומה (off + removed), כדי שמכשיר שעדיין מחובר ייחסם מיד ולא יירשם מחדש
 export const removePerson = p => Promise.all([put("staff", p.uid, {name: p.name, groups: [], off: true, removed: true}), del("staffAuth", p.uid), del("photos", p.uid), del("push", p.uid)]);
 // ---- לשונית "כלים": קישורים לאפליקציות נוספות ----
+// ---- סידור ישיבה: seating/<uid>/classes/<cid>. כל איש צוות רואה ושומר רק את שלו (שמות תלמידים - גם לא ההנהלה) ----
+let seatOn = false;
+const seatPath = () => "seating/" + S.user.uid + "/classes";
+export function startSeating() {   // רק כשנכנסים למסך, לא בפתיחת האפליקציה
+  if (seatOn) return; seatOn = true;
+  watch(seatPath(), (list, err) => { S.seatErr = !!err; S.seating = list || S.seating || []; changed(); });
+}
+export const saveSeating = (id, d) => put(seatPath(), id, d);
+export const delSeating = id => del(seatPath(), id);
+export const myHome = () => (S.T && S.T.homes && S.T.homes[S.user.name] || {}).cls || "";   // הכיתה שאני מחנכ/ת לפי מערכת השעות
+
 export const tools = () => (S.toolsDoc && Array.isArray(S.toolsDoc.list) ? S.toolsDoc.list : DEFAULT_TOOLS);
 export const saveTools = list => put("meta", "tools", {list});
 export const saveGroups = list => put("meta", "groups", {list});

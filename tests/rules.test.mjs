@@ -134,6 +134,19 @@ await t("admin cannot read chat", no(getDoc(doc(A, "chats/" + cid))));
 await t("admin cannot read chat messages", no(getDocs(collection(A, "chats/" + cid + "/msgs"))));
 await t("outsider cannot send into chat", no(addDoc(collection(A, "chats/" + cid + "/msgs"), {by: "t_admin", text: "x", at: 3})));
 await t("cannot send as the other member", no(addDoc(collection(T1, "chats/" + cid + "/msgs"), {by: "t_two", text: "x", at: 3})));
+// סידור ישיבה: רק של עצמי, גם לא ההנהלה
+const seat = {className: "ד׳ מירי", teacher: "מירי", students: ["כהן נועה", "לוי איתי"], layout: {type: "cols", cols: 4}, seats: ["כהן נועה", null, "לוי איתי"], nameMode: "short", nameOrder: "lf", updated: 1};
+await t("save own seating", ok(setDoc(doc(T1, "seating/t_one/classes/c1"), seat)));
+await t("update own seating", ok(setDoc(doc(T1, "seating/t_one/classes/c1"), {...seat, seats: [null, "כהן נועה"], updated: 2})));
+await t("list own seating", ok(getDocs(collection(T1, "seating/t_one/classes"))));
+await t("cannot read another's seating", no(getDocs(collection(T2, "seating/t_one/classes"))));
+await t("admin cannot read seating", no(getDoc(doc(A, "seating/t_one/classes/c1"))));
+await t("cannot write another's seating", no(setDoc(doc(T2, "seating/t_one/classes/c2"), seat)));
+await t("cannot delete another's seating", no(deleteDoc(doc(A, "seating/t_one/classes/c1"))));
+await t("seating extra field refused", no(setDoc(doc(T1, "seating/t_one/classes/c3"), {...seat, evil: 1})));
+await t("seating huge list refused", no(setDoc(doc(T1, "seating/t_one/classes/c3"), {...seat, students: Array(81).fill("x")})));
+await t("blocked cannot save seating", no(setDoc(doc(B, "seating/t_blocked/classes/c1"), seat)));
+await t("delete own seating", ok(deleteDoc(doc(T1, "seating/t_one/classes/c1"))));
 
 await env.cleanup();
 console.log(process.exitCode ? "rules: FAILURES above" : "firestore.rules: all " + n + " checks passed");

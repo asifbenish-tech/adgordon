@@ -3,10 +3,12 @@
 import {S} from "../state.js";
 import {$, esc, rid} from "../util.js";
 import {isAdmin, tools, saveTools} from "../data.js";
-import {empty, field, ui, tryDo} from "../ui.js";
+import {empty, field, ui, tryDo, secHead} from "../ui.js";
 
 const ICONS = ["fa-table-cells", "fa-school", "fa-book-open", "fa-utensils", "fa-chair", "fa-calendar-check", "fa-chalkboard-user", "fa-clipboard-list", "fa-children", "fa-graduation-cap", "fa-file-signature", "fa-laptop", "fa-music", "fa-futbol", "fa-heart-pulse", "fa-link"];
 const COLORS = [["blue", "כחול"], ["teal", "טורקיז"], ["gold", "זהב"], ["green", "ירוק"], ["violet", "סגול"], ["rose", "אדום"], ["slate", "אפור"]];
+// כלים שבתוך האפליקציה עצמה: קבועים, לא חלק מהרשימה שההנהלה עורכת
+const BUILTIN = [{href: "#/seat", name: "סידור ישיבה", desc: "מפת הכיתה שלך, להזזה ולהדפסה. נשמרת אצלך", icon: "fa-chair", color: "teal"}];
 let edit = false, editing = "";
 const okUrl = u => /^https:\/\/[^\s]+\.[^\s]+$/.test(u);
 
@@ -34,7 +36,8 @@ export default {
   html() {
     if (S.staff == null) return '<div class="skel"><i></i><i></i><i></i></div>';
     const list = tools();
-    let h = '<p class="lead">אפליקציות נוספות של בית החינוך. כל כלי נפתח בחלון חדש.</p>';
+    let h = '<div class="list">' + BUILTIN.map(x => '<a class="item tool" href="' + x.href + '"><div class="ico ' + x.color + '"><i class="fa-solid ' + x.icon + '"></i></div><div><b>' + x.name + "</b><span>" + x.desc + '</span></div><i class="fa-solid fa-chevron-left go"></i></a>').join("") + "</div>";
+    h += secHead("אפליקציות נוספות של בית החינוך") + '<p class="lead">כל אחת נפתחת בחלון חדש.</p>';
     h += list.length ? '<div class="list">' + list.map((x, i) => toolHtml(x, i, list.length)).join("") + "</div>" : empty("עדיין אין כלים", isAdmin() ? "אפשר להוסיף את הראשון כאן למטה." : "ההנהלה תוסיף כאן אפליקציות בהמשך.", "fa-grip");
     if (isAdmin()) {
       if (edit) h += editing ? '<div class="card">' + formHtml(list.find(x => x.id === editing)) + "</div>"

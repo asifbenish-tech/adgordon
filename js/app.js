@@ -16,8 +16,9 @@ import profile from "./views/profile.js";
 import menu from "./views/menu.js";
 import {portal, bank} from "./views/portal.js";
 import tools from "./views/tools.js";
+import seat from "./views/seat.js";
 
-const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: menu, edit: profile, portal, bank, tools};
+const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: menu, edit: profile, portal, bank, tools, seat};
 // המערכת והשמירות נמצאות באזור האישי (לחיצה על התמונה למעלה)
 const TABS = [["home", "היום", "fa-sun"], ["msg", "הודעות", "fa-comments"], ["cal", "אירועים", "fa-calendar-days"], ["portal", "מידע", "fa-book-open"], ["tools", "כלים", "fa-grip"]];
 let last = "";
@@ -35,6 +36,7 @@ function render(force) {
   badge();
   $("title").textContent = v.title(r.arg);
   document.body.classList.toggle("hero", r.name === "home");
+  document.body.classList.toggle("wide", !!v.wide);   // מסך שצריך רוחב (מפת הכיתה)
   $("sub").textContent = r.name === "home" ? dateLine() : "בית חינוך א.ד. גורדון";
   $("me").innerHTML = avatar(S.user);
   $("back").hidden = !v.parent;

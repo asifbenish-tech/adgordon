@@ -13,6 +13,8 @@ export const S = {
   myAuth: null,          // פרטי הכניסה שלי (מייל) - כל אחד רואה רק את שלו
   portal: null, bank: null, portalErr: false,   // פורטל המידע ומאגר הפעילויות (נקראים מהפורטל)
   checkins: null,        // אישורי הגעה לשמירה: שלי, ואצל הנהלה/אחראי ביטחון - של כולם היום
+  seating: null,         // סידורי הישיבה שלי (seating/<uid>/classes): [{id, className, teacher, students, layout, seats, ...}]
+  seatErr: false,        // לא הצלחנו לקרוא אותם (אין אינטרנט, או שהכללים עוד לא הודבקו)
   toolsDoc: null,        // meta/tools - רשימת האפליקציות בלשונית "כלים"
   photos: null,          // {uid: "data:image/jpeg;base64,..."} - תמונות הפרופיל
   mgmt: null,            // הודעות צוות הניהול (תיבה נפרדת, רק לחברי הקבוצה)
