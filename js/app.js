@@ -18,7 +18,7 @@ import {portal, bank} from "./views/portal.js";
 
 const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: menu, edit: profile, portal, bank};
 // המערכת והשמירות נמצאות באזור האישי (לחיצה על התמונה למעלה)
-const TABS = [["home", "היום", "fa-house"], ["msg", "הודעות", "fa-comments"], ["cal", "אירועים", "fa-calendar-days"], ["portal", "מידע", "fa-book-open"]];
+const TABS = [["home", "היום", "fa-sun"], ["msg", "הודעות", "fa-comments"], ["cal", "אירועים", "fa-calendar-days"], ["portal", "מידע", "fa-book-open"]];
 let last = "";
 
 export const route = () => { const [name, arg] = location.hash.replace(/^#\/?/, "").split("/"); return {name: VIEWS[name] ? name : "home", arg: arg ? decodeURIComponent(arg) : ""}; };
@@ -27,8 +27,8 @@ export const go = h => { if (location.hash === "#/" + h) render(true); else loca
 function render(force) {
   const el = $("view"), r = route(), v = VIEWS[r.name], key = r.name + "/" + r.arg;
   document.body.classList.toggle("in", !!S.user);
-  if (!S.ready) { el.innerHTML = '<p class="lead">טוען…</p>'; return; }
-  if (!S.user) { document.body.classList.remove("hero"); $("sub").textContent = "אפליקציית הצוות"; $("title").textContent = "בית חינוך א.ד. גורדון"; $("back").hidden = true; el.innerHTML = loginHtml(); bindLogin(); last = ""; return; }
+  if (!S.ready) { el.innerHTML = '<div class="skel" role="status" aria-label="טוען"><i></i><i></i><i></i></div>'; return; }
+  if (!S.user) { document.body.classList.remove("hero"); $("sub").textContent = "אפליקציית הצוות"; $("title").textContent = "בית חינוך א.ד. גורדון"; $("back").hidden = true; el.innerHTML = loginHtml(); bindLogin(); if (last !== "login") enter(el); last = "login"; return; }
   const tab = v.tab != null ? v.tab : r.name;
   for (const a of $("tabs").children) a.setAttribute("aria-current", a.dataset.t === tab ? "page" : "false");
   badge();
@@ -45,8 +45,17 @@ function render(force) {
   el.innerHTML = (DEMO ? '<div class="demo"><b>מצב הדגמה.</b> נתוני דוגמה שנשמרים רק במכשיר הזה.</div>' : "") +
     (S.err ? '<div class="err" role="alert">' + esc(S.err) + "</div>" : "") + v.html(r.arg);
   v.bind(el, r.arg);
-  if (!same) window.scrollTo(0, 0); else el.scrollTop = top;
+  if (!same) { window.scrollTo(0, 0); enter(el); } else el.scrollTop = top;
 }
+
+// כניסה מדורגת: רק כשעוברים מסך, לא בכל עדכון נתונים
+function enter(el) { el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); clearTimeout(enter.t); enter.t = setTimeout(() => el.classList.remove("enter"), 700); }
+
+// גודל טקסט: 100% / 112% / 125%, נשמר במכשיר. כל העיצוב ב-rem, כך שהכול גדל יחד.
+const SIZES = [1, 1.12, 1.25];
+function setFs(v) { document.documentElement.style.setProperty("--fs", v); $("aa").textContent = v > 1 ? "א" + "+".repeat(SIZES.indexOf(v)) : "א+"; $("aa").setAttribute("aria-label", "גודל טקסט: " + Math.round(v * 100) + "%"); }
+setFs(SIZES.includes(+localStorage.getItem("adgFs")) ? +localStorage.getItem("adgFs") : 1);
+$("aa").onclick = () => { const cur = +getComputedStyle(document.documentElement).getPropertyValue("--fs") || 1, v = SIZES[(SIZES.indexOf(cur) + 1) % SIZES.length]; try { localStorage.setItem("adgFs", v); } catch (e) {} setFs(v); };
 
 function badge() {
   const em = document.querySelector('#tabs a[data-t="msg"] em'), n = unreadBoard() + unreadChats() + unreadMgmt();

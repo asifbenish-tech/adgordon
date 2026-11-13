@@ -5,7 +5,7 @@ import {$, esc, uidOf, rid} from "../util.js";
 import {isAdmin, groups, people, saveStaff, saveGroups, suggestGroups, dutyUnmatched, setAlias, saveAuth, removePerson} from "../data.js";
 import {DEMO} from "../config.js";
 import {idHash, idToken, api} from "../auth.js";
-import {empty, field, tags, avatar, chips, ui, tryDo} from "../ui.js";
+import {empty, loading, field, tags, avatar, chips, ui, tryDo} from "../ui.js";
 
 let q = "", flt = "", open = "", mode = "list";
 const ROLES = [["teacher", "צוות הוראה"], ["classes", "צוות (לא הוראה)"], ["coordinator", "ריכוז בית"], ["admin", "הנהלה - ניהול מלא"]];
@@ -49,7 +49,7 @@ export default {
   title: () => "ניהול צוות וקבוצות",
   html() {
     if (!isAdmin()) return empty("המסך הזה פתוח להנהלה בלבד");
-    if (S.staff == null) return '<p class="lead">טוען…</p>';
+    if (S.staff == null) return loading;
     const sug = suggestGroups(), ps = people(), un = S.duty ? dutyUnmatched() : [];
     const withCount = groups().map(g => ({id: g.id, label: g.label + " " + ps.filter(p => p.groups.includes(g.id)).length}));
     const imp = S.auth && !authOn() && !DEMO ? '<div class="card note warn"><b><i class="fa-solid fa-right-left"></i> להעביר את ניהול הכניסה לכאן</b><p>כרגע רשימת תעודות הזהות והמיילים מנוהלת בלוח המערכות ובגיליון. לחיצה אחת מעתיקה אותה לכאן, ומאותו רגע מוסיפים, מעדכנים ומסירים אנשי צוות רק מהמסך הזה. לוח המערכות עצמו לא משתנה.</p><button type="button" class="btn" id="imp">ייבוא רשימת הצוות</button></div>' : "";

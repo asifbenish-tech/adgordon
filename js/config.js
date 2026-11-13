@@ -20,6 +20,10 @@ export const EVENTS_VIEW = "https://docs.google.com/spreadsheets/d/" + EVENTS_SH
 // התראות דחיפה: המפתח הציבורי (VAPID) מ-Firebase console -> Project settings -> Cloud Messaging -> Web Push certificates.
 // ריק = אין התראות דחיפה (האפליקציה מציעה רק את יומן הטלפון).
 export const PUSH_KEY = "BHr93LSQBTkb7Av1wAeSaFDkFjN0eYrNNQoGtkkh4tylPlXGRSjiP-sF_7bBmVwAhP7xl6PDxV56DPZkMdLX2Dw";
+// לוח הצלצולים: שעה -> [התחלה, סוף]. משמש את "היום שלי" כדי להציג שיעורים לפי שעון.
+// ההפסקות (9:40, 11:30, 12:35) תואמות את לוח השמירות. לאמת מול לוח הצלצולים הרשמי ולתקן כאן אם צריך.
+export const BELLS = {1: ["08:10", "08:55"], 2: ["08:55", "09:40"], 3: ["10:00", "10:45"], 4: ["10:45", "11:30"], 5: ["11:50", "12:35"],
+  6: ["12:55", "13:40"], 7: ["13:40", "14:25"], 8: ["14:25", "15:10"], 9: ["15:10", "15:55"]};
 export const ID_SALT = "gordon-lohot-2026";   // אותו מלח כמו בלוח המערכות
 // מצב הדגמה: בלי שרת ובלי Firebase, נתוני דוגמה שנשמרים רק במכשיר.
 // פעיל כל עוד אין שרת כניסה, או עם ?demo=1 בכתובת.

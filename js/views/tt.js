@@ -3,7 +3,7 @@ import {S} from "../state.js";
 import {BOARD_URL} from "../config.js";
 import {$, esc, fmtDate, heSort} from "../util.js";
 import {isAdmin, fullName} from "../data.js";
-import {empty, ui} from "../ui.js";
+import {empty, loading, ui} from "../ui.js";
 
 const SIDES = {"יסודי": "#0284c7", "חטיבה": "#4f46e5", 'תל"ן': "#d97706", "מגמות": "#9333ea", "סדירות": "#059669"};
 let day = null, who = null;
@@ -27,7 +27,7 @@ export default {
   title: () => "המערכת שלי",
   html() {
     const T = S.T;
-    if (!T) return '<p class="lead">טוען את המערכת…</p>';
+    if (!T) return loading;
     if (day == null) { const t = todayIdx(); day = t >= T.days.length ? 0 : t; }
     const me = who || S.user.name, list = slots(me, day);
     let h = "";
