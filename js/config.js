@@ -31,6 +31,8 @@ export const DEFAULT_TOOLS = [
   {id: "sg", name: "בית ספר גורדון", desc: "נוכחות, היעדרויות ובקשות חופשה", url: "https://school-gordon.web.app/", icon: "fa-school", color: "teal"},
   {id: "portal", name: "פורטל המידע (באתר)", desc: "הפורטל המלא, כפי שהוא נפתח בדפדפן", url: "https://asifbenish-tech.github.io/gordon-staff/", icon: "fa-book-open", color: "gold"}
 ];
+// ניהול הצוות נעשה באפליקציה נפרדת (הריפו gordon-users), לא כאן
+export const STAFF_APP_URL = "https://asifbenish-tech.github.io/gordon-users/";
 export const ID_SALT = "gordon-lohot-2026";   // אותו מלח כמו בלוח המערכות
 // מצב הדגמה: בלי שרת ובלי Firebase, נתוני דוגמה שנשמרים רק במכשיר.
 // פעיל כל עוד אין שרת כניסה, או עם ?demo=1 בכתובת.

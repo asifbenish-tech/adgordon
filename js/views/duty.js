@@ -1,6 +1,7 @@
 // תורנות שמירה בהפסקות: לוח שבועי קבוע. המקור: הגיליון של רכז התורנויות, עותק ב-data/duty.json.
 // השמות בגיליון חופשיים ("גלית ז", "אלי מור"); data.js מתאים אותם לאנשי הצוות.
 import {S} from "../state.js";
+import {STAFF_APP_URL} from "../config.js";
 import {$, esc, DAYN} from "../util.js";
 import {isAdmin, dutySlots, myDuty, dutyUnmatched, dutyNow, checkIn, checkedIn, seesCheckins} from "../data.js";
 import {hhmm} from "../util.js";
@@ -59,7 +60,7 @@ export default {
     const un = dutyUnmatched();
     return '<div class="seg" role="group" aria-label="תצוגה"><button type="button" data-all="0" aria-pressed="' + !all + '">השמירות שלי</button><button type="button" data-all="1" aria-pressed="' + all + '">הלוח המלא</button></div>' +
       (all ? boardHtml() : mineHtml()) +
-      (isAdmin() && un.length ? '<a class="item" href="#/staff"><div class="ico"><i class="fa-solid fa-user-tag"></i></div><div><b>' + un.length + " שמות בלוח לא זוהו</b><span>" + esc(un.join(", ")) + " · לשיוך במסך ניהול הצוות</span></div></a>" : "") +
+      (isAdmin() && un.length ? '<a class="item" href="' + STAFF_APP_URL + '" target="_blank" rel="noopener"><div class="ico"><i class="fa-solid fa-user-tag"></i></div><div><b>' + un.length + " שמות בלוח לא זוהו</b><span>" + esc(un.join(", ")) + " · לשיוך באפליקציית ניהול הצוות</span></div></a>" : "") +
       '<p class="hint">' + esc(S.duty.title || "") + (S.duty.updated ? " · מעודכן ל-" + esc(S.duty.updated.split("-").reverse().join(".")) : "") + (S.duty.source ? ' · <a href="' + esc(S.duty.source) + '" target="_blank" rel="noopener">לגיליון המקורי</a>' : "") + "</p>";
   },
   bind(el) {

@@ -88,7 +88,7 @@ export default {
     h += secHead("קיצורי דרך") + '<div class="list">' +
       '<a class="item" href="#/duty"><div class="ico gold"><i class="fa-solid fa-shield-halved"></i></div><div><b>תורנות שמירה</b><span>השמירות שלי והלוח המלא</span></div><i class="fa-solid fa-chevron-left go"></i></a>' +
       '<a class="item" href="#/new"><div class="ico green"><i class="fa-solid fa-address-book"></i></div><div><b>אנשי הצוות</b><span>חיוג ושיחה פרטית</span></div><i class="fa-solid fa-chevron-left go"></i></a>' +
-      (isAdmin() ? '<a class="item" href="#/staff"><div class="ico slate"><i class="fa-solid fa-users-gear"></i></div><div><b>ניהול צוות וקבוצות</b><span>שיוך, כניסה ותפקידים</span></div><i class="fa-solid fa-chevron-left go"></i></a>' : "") + "</div>";
+      "</div>";
     return h;
   },
   bind(el) {

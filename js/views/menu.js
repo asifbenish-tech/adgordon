@@ -19,7 +19,6 @@ export default {
       row("#/tt", "fa-table-cells", "violet", "המערכת שלי", n == null ? "מערכת השעות האישית" : n ? (n === 1 ? "שיעור אחד היום" : n + " שיעורים היום") : "אין שיעורים היום") +
       row("#/duty", "fa-shield-halved", "", "תורנות שמירה", nd ? "הבאה: " + esc(nd.when) + " ב-" + esc(nd.slot.from.replace(/^0/, "")) + " · " + esc(nd.slot.places.join(" + ")) : "השמירות שלי והלוח המלא") +
       row("#/edit", "fa-user-pen", "blue", "עדכון פרטים", "תמונה, שם מלא, טלפון ומייל") +
-      (isAdmin() ? row("#/staff", "fa-users-gear", "blue", "ניהול צוות וקבוצות", "אנשי הצוות, שיוך וכניסה") : "") +
       '</div><button type="button" class="btn ghost" id="out"><i class="fa-solid fa-right-from-bracket"></i> יציאה מהחשבון</button>';
   },
   bind() { $("out").onclick = signOut; }
