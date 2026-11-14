@@ -699,3 +699,21 @@ body:has(.ssel) .dtoast{bottom:calc(var(--tabs) + env(safe-area-inset-bottom,0px
 @media (min-width:560px){.apps{grid-template-columns:repeat(5,1fr)}}
 .item.tool>div.tmove:not(.ico):not(.date){display:flex;flex:none;gap:.1rem}
 .ttl small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* קישור "כל האירועים" מתחת לרצועת השבוע */
+.wklink{display:flex;align-items:center;justify-content:center;gap:.45rem;margin-top:.7rem;padding:.55rem;min-height:2.75rem;border-radius:.9rem;background:rgba(255,255,255,.12);color:#fff;text-decoration:none;font-size:.94rem;font-weight:500}
+.wklink:active{background:rgba(255,255,255,.22)}
+.wklink .fa-chevron-left{font-size:.75rem;opacity:.8}
+/* אנשי הצוות: שורה עם שלוש פעולות */
+.person-row{align-items:center}
+.person-row .ph{font-size:.88rem;color:var(--muted);text-align:right}
+.acts{display:flex;gap:.4rem;flex:none}
+.act{width:2.75rem;height:2.75rem;border-radius:50%;display:grid;place-items:center;color:#fff;text-decoration:none;font-size:1.05rem}
+.act.chat{background:var(--i-blue)}.act.tel{background:var(--i-green)}.act.wa{background:#1fa855;font-size:1.3rem}
+.act:active{transform:scale(.92)}
+.item.person-row>div.acts:not(.ico):not(.date){display:flex;flex:none;gap:.4rem;align-items:center}
+/* אנשי הצוות: שם וטלפון בשורה הראשונה, שלושת הכפתורים בשורה משלהם מתחת לשם - כך שום דבר לא נחתך, גם בטקסט מוגדל */
+.item.person-row{flex-wrap:wrap;row-gap:.55rem}
+.item.person-row>div:not(.ico):not(.date):not(.acts){flex:1 1 calc(100% - 4rem)}
+.item.person-row>div.acts:not(.ico):not(.date){margin-inline-start:3.45rem}
+.person-row .ph{white-space:nowrap}

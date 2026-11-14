@@ -23,6 +23,7 @@ export function dayCard(d, opt = {}) {
 }
 
 export default {
+  parent: "home", tab: "home",   // אין לשונית משלו: נכנסים מהקישור מתחת לרצועת השבוע במסך הבית
   title: () => "אירועים והערכות",
   html() {
     if (S.sheet == null || S.events == null) return loading;

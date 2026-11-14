@@ -65,7 +65,7 @@ export default {
     let h = '<div class="wkwrap"><div class="wk" role="group" aria-label="בחירת יום">' + days.map(d => {
       const k = iso(d), c = byDate(d), cls = [k === today() ? "today" : "", c && c.acts.some(a => a.k === "vac") ? "is-vac" : c && c.acts.length ? "has-ev" : myDays.has(d.getDay()) ? "has-du" : ""].filter(Boolean).join(" ");
       return '<button type="button" data-day="' + k + '" aria-pressed="' + (k === sel) + '"' + (cls ? ' class="' + cls + '"' : "") + ">" + "אבגדהוש"[d.getDay()] + "׳<b>" + d.getDate() + "</b><i></i></button>";
-    }).join("") + "</div></div>";
+    }).join("") + '</div><a class="wklink" href="#/cal"><i class="fa-solid fa-calendar-days"></i> כל האירועים וההערכות <i class="fa-solid fa-chevron-left"></i></a></div>';
     // הודעות חדשות: פס אחד, לא מסך
     const un = unreadBoard() + unreadChats() + unreadMgmt(), last = S.board && S.board[0];
     if (un) h += '<a class="alert" href="#/msg"><i class="fa-solid fa-envelope"></i><span><b>' + (un === 1 ? "הודעה חדשה" : un + " הודעות חדשות") + "</b>" + (last ? " · " + esc(last.title) : "") + '</span><i class="fa-solid fa-chevron-left go"></i></a>';
@@ -87,7 +87,7 @@ export default {
     }).join("") + "</div>";
     h += secHead("קיצורי דרך") + '<div class="list">' +
       '<a class="item" href="#/duty"><div class="ico gold"><i class="fa-solid fa-shield-halved"></i></div><div><b>תורנות שמירה</b><span>השמירות שלי והלוח המלא</span></div><i class="fa-solid fa-chevron-left go"></i></a>' +
-      '<a class="item" href="#/new"><div class="ico green"><i class="fa-solid fa-address-book"></i></div><div><b>אנשי הצוות</b><span>חיוג ושיחה פרטית</span></div><i class="fa-solid fa-chevron-left go"></i></a>' +
+      '<a class="item" href="#/cal"><div class="ico blue"><i class="fa-solid fa-calendar-days"></i></div><div><b>לוח אירועים והערכות</b><span>חגים, טיולים, מבחנים לפי חודש</span></div><i class="fa-solid fa-chevron-left go"></i></a>' +
       "</div>";
     return h;
   },

@@ -25,7 +25,7 @@ function boardHtml(kind) {
 
 function chatsHtml() {
   if (S.chats == null) return loading;
-  return '<a class="btn ghost" href="#/new"><i class="fa-solid fa-address-book"></i> אנשי הצוות: שיחה חדשה או חיוג</a>' +
+  return '<a class="btn ghost" href="#/new"><i class="fa-solid fa-pen-to-square"></i> שיחה חדשה</a>' +
     (S.chats.length ? '<div class="list">' + S.chats.map(c => { const o = person(otherOf(c)), l = c.last || {};
       return '<a class="item chatrow' + (chatUnread(c) ? " new" : "") + '" href="#/chat/' + encodeURIComponent(o.uid) + '">' + avatar(o) + "<div><b>" + esc(o.full) + "</b><span>" +
         (l.by === S.user.uid ? "את/ה: " : "") + esc(l.text || "") + "</span></div><small>" + (l.at ? esc(ago(l.at)) : "") + "</small></a>"; }).join("") + "</div>"
@@ -62,18 +62,28 @@ export const msg = {
   }
 };
 
-// ---- בחירת איש צוות לשיחה חדשה ----
+// ---- אנשי הצוות (לשונית "צוות"): חיפוש, סינון לפי קבוצה, ולכל אחד: הודעה באפליקציה, חיוג, וואטסאפ ----
+// מספר ישראלי לוואטסאפ: 050-1234567 -> 972501234567
+export const waNum = ph => { let d = String(ph || "").replace(/\D/g, ""); if (d.startsWith("00")) d = d.slice(2); if (d.startsWith("0")) d = "972" + d.slice(1); return d.length >= 11 ? d : ""; };
 const pickList = () => {
   const s = q.trim(), list = people().filter(p => p.uid !== S.user.uid && !p.off && (!flt || p.groups.includes(flt)) && (!s || p.full.includes(s) || p.name.includes(s)));
-  return list.length ? list.map(p => '<a class="item" href="#/chat/' + encodeURIComponent(p.uid) + '">' + avatar(p) + "<div><b>" + esc(p.full) + '</b><div class="tags">' + tags(p.groups) + "</div></div>" + (p.phone ? '<span class="call" data-tel="' + esc(p.phone) + '" role="link" tabindex="0" aria-label="חיוג אל ' + esc(p.full) + '"><i class="fa-solid fa-phone"></i></span>' : "") + "</a>").join("") : empty("לא נמצאו אנשי צוות");
+  return list.length ? list.map(p => {
+    const tel = String(p.phone || "").replace(/[^\d+]/g, ""), wa = waNum(p.phone);
+    return '<div class="item person-row">' + avatar(p) + "<div><b>" + esc(p.full) + '</b><div class="tags">' + tags(p.groups) + "</div>" + (p.phone ? '<span dir="ltr" class="ph">' + esc(p.phone) + "</span>" : "") + "</div>" +
+      '<div class="acts">' +
+      '<a class="act chat" href="#/chat/' + encodeURIComponent(p.uid) + '" aria-label="הודעה באפליקציה אל ' + esc(p.full) + '"><i class="fa-solid fa-comment"></i></a>' +
+      (tel ? '<a class="act tel" href="tel:' + esc(tel) + '" aria-label="חיוג אל ' + esc(p.full) + '"><i class="fa-solid fa-phone"></i></a>' : "") +
+      (wa ? '<a class="act wa" href="https://wa.me/' + wa + '" target="_blank" rel="noopener" aria-label="וואטסאפ אל ' + esc(p.full) + '"><i class="fa-brands fa-whatsapp"></i></a>' : "") +
+      "</div></div>";
+  }).join("") : empty("לא נמצאו אנשי צוות", s ? "אפשר לנסות שם אחר." : "", "fa-user-group");
 };
 export const pick = {
-  parent: "msg", tab: "msg",
   title: () => "אנשי הצוות",
-  html: () => '<input class="search" id="pq" type="search" placeholder="חיפוש לפי שם" value="' + esc(q) + '" autocomplete="off">' + chips(groups(), flt, "data-g") + '<div class="list" id="plist">' + pickList() + "</div>",
+  html: () => '<input class="search" id="pq" type="search" placeholder="חיפוש לפי שם" value="' + esc(q) + '" autocomplete="off">' + chips(groups(), flt, "data-g") +
+    '<div class="list" id="plist">' + pickList() + "</div>" +
+    '<p class="hint center"><i class="fa-solid fa-comment"></i> הודעה באפליקציה · <i class="fa-solid fa-phone"></i> חיוג · <i class="fa-brands fa-whatsapp"></i> וואטסאפ. הטלפון מופיע רק למי שמילא אותו.</p>',
   bind(el) {
     $("pq").oninput = e => { q = e.target.value; $("plist").innerHTML = pickList(); };
-    $("plist").onclick = e => { const c = e.target.closest("[data-tel]"); if (c) { e.preventDefault(); location.href = "tel:" + c.dataset.tel.replace(/[^\d+]/g, ""); } };
     for (const b of el.querySelectorAll("[data-g]")) b.onclick = () => { flt = b.dataset.g; ui.render(); };
   },
   update() { $("plist").innerHTML = pickList(); }
