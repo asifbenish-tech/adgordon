@@ -149,6 +149,21 @@ await t("seating extra field refused", no(setDoc(doc(T1, "seating/t_one/classes/
 await t("seating huge list refused", no(setDoc(doc(T1, "seating/t_one/classes/c3"), {...seat, students: Array(81).fill("x")})));
 await t("blocked cannot save seating", no(setDoc(doc(B, "seating/t_blocked/classes/c1"), seat)));
 await t("delete own seating", ok(deleteDoc(doc(T1, "seating/t_one/classes/c1"))));
+// סידור חדר האוכל: רק המחנך עצמו
+const din = {name: "ו׳2", students: [{id: "s_1", name: "נועה כהן"}], columns: [7, 8, 7], teams: [{id: "tm_1", name: "צוות אדום", color: "red"}], tables: {"1": {team: "tm_1", active: true}},
+  roles: [{id: "cups", name: "סידור כוסות", icon: "cup", count: 1, fixed: null, tables: [1]}], opts: {mode: "team", stage: "במה"},
+  today: {date: "2026-11-14", absent: [], plan: {date: "2026-11-14", kind: "team", roles: {cups: ["s_1"]}, teams: {tm_1: []}, unassigned: [], extras: {}}},
+  hist: {"2026-11-14": {date: "2026-11-14", kind: "team", roles: {cups: ["s_1"]}, teams: {}, extras: {}}}, updated: 1};
+await t("save own dining", ok(setDoc(doc(T1, "dining/t_one/classes/d1"), din)));
+await t("update own dining", ok(setDoc(doc(T1, "dining/t_one/classes/d1"), {...din, today: null, updated: 2})));
+await t("list own dining", ok(getDocs(collection(T1, "dining/t_one/classes"))));
+await t("cannot read another's dining", no(getDocs(collection(T2, "dining/t_one/classes"))));
+await t("admin cannot read dining", no(getDoc(doc(A, "dining/t_one/classes/d1"))));
+await t("cannot write another's dining", no(setDoc(doc(T2, "dining/t_one/classes/d2"), din)));
+await t("dining extra field refused", no(setDoc(doc(T1, "dining/t_one/classes/d3"), {...din, evil: 1})));
+await t("dining huge list refused", no(setDoc(doc(T1, "dining/t_one/classes/d3"), {...din, students: Array(81).fill({id: "x", name: "x"})})));
+await t("blocked cannot save dining", no(setDoc(doc(B, "dining/t_blocked/classes/d1"), din)));
+await t("delete own dining", ok(deleteDoc(doc(T1, "dining/t_one/classes/d1"))));
 
 await env.cleanup();
 console.log(process.exitCode ? "rules: FAILURES above" : "firestore.rules: all " + n + " checks passed");

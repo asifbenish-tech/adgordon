@@ -272,6 +272,15 @@ export function startSeating() {   // רק כשנכנסים למסך, לא בפ�
 }
 export const saveSeating = (id, d) => put(seatPath(), id, d);
 export const delSeating = id => del(seatPath(), id);
+// ---- סידור חדר האוכל: dining/<uid>/classes/<cid>. כל מחנך רואה ושומר רק את שלו (שמות תלמידים - גם לא ההנהלה) ----
+let dinOn = false;
+const dinPath = () => "dining/" + S.user.uid + "/classes";
+export function startDining() {   // רק כשנכנסים למסך
+  if (dinOn) return; dinOn = true;
+  watch(dinPath(), (list, err) => { S.diningErr = !!err; S.dining = list || S.dining || []; changed(); });
+}
+export const saveDining = (id, d) => put(dinPath(), id, d);
+export const delDining = id => del(dinPath(), id);
 export const myHome = () => (S.T && S.T.homes && S.T.homes[S.user.name] || {}).cls || "";   // הכיתה שאני מחנכ/ת לפי מערכת השעות
 
 export const tools = () => (S.toolsDoc && Array.isArray(S.toolsDoc.list) ? S.toolsDoc.list : DEFAULT_TOOLS);

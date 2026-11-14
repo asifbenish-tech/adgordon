@@ -17,8 +17,9 @@ import menu from "./views/menu.js";
 import {portal, bank} from "./views/portal.js";
 import tools from "./views/tools.js";
 import seat from "./views/seat.js";
+import dining from "./views/dining.js";
 
-const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: menu, edit: profile, portal, bank, tools, seat};
+const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: menu, edit: profile, portal, bank, tools, seat, dining};
 // המערכת והשמירות נמצאות באזור האישי (לחיצה על התמונה למעלה)
 const TABS = [["home", "היום", "fa-sun"], ["msg", "הודעות", "fa-comments"], ["cal", "אירועים", "fa-calendar-days"], ["portal", "מידע", "fa-book-open"], ["tools", "כלים", "fa-grip"]];
 let last = "";

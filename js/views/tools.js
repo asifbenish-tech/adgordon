@@ -10,7 +10,8 @@ import {empty, field, ui, tryDo} from "../ui.js";
 const ICONS = ["fa-table-cells", "fa-school", "fa-book-open", "fa-utensils", "fa-chair", "fa-calendar-check", "fa-chalkboard-user", "fa-clipboard-list", "fa-children", "fa-graduation-cap", "fa-file-signature", "fa-laptop", "fa-music", "fa-futbol", "fa-heart-pulse", "fa-link"];
 const COLORS = [["blue", "כחול"], ["teal", "טורקיז"], ["gold", "זהב"], ["green", "ירוק"], ["violet", "סגול"], ["rose", "אדום"], ["slate", "אפור"]];
 // כלים שבתוך האפליקציה עצמה: קבועים, לא חלק מהרשימה שההנהלה עורכת
-const BUILTIN = [{href: "#/seat", name: "סידור ישיבה", desc: "מפת הכיתה שלך, להזזה ולהדפסה. נשמרת אצלך", icon: "fa-chair", color: "teal"}];
+const BUILTIN = [{href: "#/seat", name: "סידור ישיבה", desc: "מפת הכיתה שלך, להזזה ולהדפסה. נשמרת אצלך", icon: "fa-chair", color: "teal"},
+  {href: "#/dining", name: "סידור חדר אוכל", desc: "נוכחות, צוותים ותפקידים בחדר האוכל. נשמר אצלך", icon: "fa-utensils", color: "gold"}];
 let edit = false, editing = "";
 const okUrl = u => /^https:\/\/[^\s]+\.[^\s]+$/.test(u);
 

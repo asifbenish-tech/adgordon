@@ -15,6 +15,8 @@ export const S = {
   checkins: null,        // אישורי הגעה לשמירה: שלי, ואצל הנהלה/אחראי ביטחון - של כולם היום
   seating: null,         // סידורי הישיבה שלי (seating/<uid>/classes): [{id, className, teacher, students, layout, seats, ...}]
   seatErr: false,        // לא הצלחנו לקרוא אותם (אין אינטרנט, או שהכללים עוד לא הודבקו)
+  dining: null,          // סידורי חדר האוכל שלי (dining/<uid>/classes): [{id, name, students, columns, teams, tables, roles, opts, today, hist}]
+  diningErr: false,
   toolsDoc: null,        // meta/tools - רשימת האפליקציות בלשונית "כלים"
   photos: null,          // {uid: "data:image/jpeg;base64,..."} - תמונות הפרופיל
   mgmt: null,            // הודעות צוות הניהול (תיבה נפרדת, רק לחברי הקבוצה)
