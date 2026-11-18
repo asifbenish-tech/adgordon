@@ -326,8 +326,11 @@ function changesTick_(date, day, mins) {
   if (!sa) return 0;
   var next = new Date(Date.parse(date + "T12:00:00Z") + (day === 5 ? 2 : 1) * 86400000).toISOString().slice(0, 10);
   [date, next].forEach(function (d) {
-    try { sent += syncChanges_(d, sa, mins >= CHG_PUSH[0] && mins <= CHG_PUSH[1] && (day !== 6 || mins >= 19 * 60)); }
+    var push = mins >= CHG_PUSH[0] && mins <= CHG_PUSH[1] && (day !== 6 || mins >= 19 * 60);
+    try { sent += syncChanges_(d, sa, push); }
     catch (err) { logOnce_("sg_" + d, err.message); }
+    try { sent += syncImage_(d, sa, push); }
+    catch (err) { logOnce_("sgi_" + d, err.message); }
   });
   return sent;
 }
@@ -377,6 +380,32 @@ function syncChanges_(date, sa, canPush) {
     var body = list.length ? chgLine_(list[0]) + (list.length > 1 ? " · ועוד " + (list.length - 1) : "") : "השינוי שהיה לך בוטל";
     Object.keys(d.tokens || {}).forEach(function (tok) { reqs.push(pushReq_(tok, title, body, "#/changes/" + date)); });
   });
+  if (!reqs.length) return 0;
+  return UrlFetchApp.fetchAll(reqs).filter(function (x) { return x.getResponseCode() === 200; }).length;
+}
+// תמונת מערכת השינויים שנשלחה מניהול גורדון (כפתור "לאפליקציית הצוות" בטבלת השינויים):
+// schools/main/config/staffapp_image_<תאריך> = {data: JPEG, w, h, notify: all|changed|none, at} -> daily/<תאריך> כאן.
+// מחליפה תמונה ישנה יותר (גם כזו שהועלתה ידנית), אף פעם לא חדשה יותר. "changed" = מי שיש לו שינוי ב-changes/<תאריך>.
+function syncImage_(date, sa, canPush) {
+  var c = CacheService.getScriptCache();
+  var r = UrlFetchApp.fetch(SG_FS + "schools/main/config/staffapp_image_" + date, {headers: {Authorization: "Bearer " + saToken_(sa, "sgoauth", "https://www.googleapis.com/auth/datastore")}, muteHttpExceptions: true});
+  if (r.getResponseCode() === 404) return 0;
+  if (r.getResponseCode() !== 200) throw new Error("קריאת התמונה מניהול גורדון נכשלה: " + r.getResponseCode());
+  var img = fsObj_(JSON.parse(r.getContentText()).fields || {}), at = Number(img.at) || 0;
+  if (!/^data:image\/jpeg;base64,/.test(String(img.data || "")) || String(c.get("sgi_" + date)) === String(at)) return 0;
+  var old = fsGet_("daily/" + date);
+  if (old && Number(old.at) >= at) { c.put("sgi_" + date, String(at), 21600); return 0; }
+  var mode = img.notify === "all" || img.notify === "changed" ? img.notify : "none", to = [];
+  if (mode === "all") to = ["all"];
+  if (mode === "changed") { var ch = fsGet_("changes/" + date); to = Object.keys((ch && ch.sig) || {}); }
+  fsPatch_("daily/" + date, {data: img.data, w: Number(img.w) || 0, h: Number(img.h) || 0, note: "", by: "school-gordon", byName: "ניהול גורדון", at: at, to: to});
+  c.put("sgi_" + date, String(at), 21600);
+  if (!canPush || !to.length) return 0;
+  var ids = {}, staff = fsList_("staff"), reqs = [], all = mode === "all";
+  if (all) staff.forEach(function (x) { ids[x.id] = 1; }); else to.forEach(function (u) { ids[u] = 1; });
+  staff.forEach(function (x) { if (x.off || x.removed) delete ids[x.id]; });
+  var title = all ? "מערכת השינויים עלתה" : "יש שינוי במערכת שלך", body = "ל-" + date.split("-").reverse().slice(0, 2).join(".") + " · לחיצה לפתיחת התמונה";
+  fsList_("push").forEach(function (d) { if (ids[d.id]) Object.keys(d.tokens || {}).forEach(function (tok) { reqs.push(pushReq_(tok, title, body, "#/daily/" + date)); }); });
   if (!reqs.length) return 0;
   return UrlFetchApp.fetchAll(reqs).filter(function (x) { return x.getResponseCode() === 200; }).length;
 }

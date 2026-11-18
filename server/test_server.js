@@ -356,6 +356,24 @@ assert.ok(W.fsdb["changes/2026-11-13"], "the next school day is read too");
 W.sgdb["schools/main/config/staffapp_changes_2026-11-15"] = sgSnap([R5]);
 assert.strictEqual(at("2026-11-13T18:00:00+02:00"), 1, "friday: the next school day is sunday");
 assert.strictEqual(pd().tokHasan.title, "שינוי במערכת שלך ל-15.11");
+// תמונת מערכת השינויים מניהול גורדון
+const JPG = "data:image/jpeg;base64,/9j/AAAA", img = (at, notify) => ({date: S1("2026-11-12"), data: S1(JPG), w: {integerValue: "2400"}, h: {integerValue: "900"}, notify: S1(notify), at: {integerValue: String(at)}});
+W.sgdb["schools/main/config/staffapp_image_2026-11-12"] = img(1000, "changed");
+assert.strictEqual(at("2026-11-12T08:20:00+02:00"), 2, "'changed': only people with a change that day (רותי + אנה)");
+assert.deepStrictEqual(Object.keys(pd()).sort(), ["tokA", "tokAnna"]);
+assert.deepStrictEqual(pd().tokA, {title: "יש שינוי במערכת שלך", body: "ל-12.11 · לחיצה לפתיחת התמונה", url: "#/daily/2026-11-12"});
+assert.strictEqual(W.fsdb["daily/2026-11-12"].data.stringValue, JPG);
+assert.strictEqual(W.fsdb["daily/2026-11-12"].byName.stringValue, "ניהול גורדון");
+assert.strictEqual(at("2026-11-12T08:25:00+02:00"), 0, "same image: copied once");
+W.fsdb["daily/2026-11-12"].at = {integerValue: "5000"};   // הועלתה ידנית אחר כך
+W.sgdb["schools/main/config/staffapp_image_2026-11-12"] = img(3000, "all");
+assert.strictEqual(at("2026-11-12T08:30:00+02:00"), 0, "never replaces a newer image");
+W.sgdb["schools/main/config/staffapp_image_2026-11-12"] = img(9000, "all");
+assert.ok(at("2026-11-12T08:35:00+02:00") >= 3, "'all': everyone registered");
+assert.strictEqual(pd().tokHasan.title, "מערכת השינויים עלתה");
+W.sgdb["schools/main/config/staffapp_image_2026-11-12"] = img(9500, "none");
+assert.strictEqual(at("2026-11-12T08:40:00+02:00"), 0, "'none': replaced quietly");
+assert.strictEqual(W.fsdb["daily/2026-11-12"].at.integerValue, "9500");
 W.props.SG_KEY = JSON.stringify(Object.assign({}, SA, {project_id: "other"}));
 assert.strictEqual(at("2026-11-12T08:00:00+02:00"), 0, "a key of another project is refused, without breaking tick");
 
