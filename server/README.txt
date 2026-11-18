@@ -66,3 +66,14 @@
 - התראות על שמירות: tick רץ כל 5 דקות (נוצר ב-setup). כדי להפעיל באפליקציה צריך גם מפתח Web Push:
   Firebase console -> Project settings -> Cloud Messaging -> Web Push certificates -> Generate key pair.
   המפתח (ציבורי, לא סוד) נכנס ל-PUSH_KEY ב-js/config.js.
+
+
+=== חיבור לניהול גורדון (השינויים במערכת) ===
+1. https://console.cloud.google.com/iam-admin/serviceaccounts?project=school-gordon
+   -> "Create service account" -> שם: staff-app-reader -> Continue.
+2. תפקיד (Role): Cloud Datastore Viewer (קריאה בלבד) -> Done.
+3. לוחצים על החשבון שנוצר -> Keys -> Add key -> Create new key -> JSON -> Create. קובץ יורד.
+4. בעורך Apps Script: Project Settings (גלגל שיניים) -> Script properties -> Add property
+   שם: SG_KEY   ערך: כל התוכן של הקובץ שירד. Save.
+5. להריץ setup - במייל תופיע השורה "השינויים במערכת מניהול גורדון: עובד ✓".
+את הקובץ שירד למחוק מהמחשב אחרי ההדבקה. לא לשלוח אותו בצ'אט או במייל.

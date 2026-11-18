@@ -749,3 +749,25 @@ body:has(.ssel) .dtoast{bottom:calc(var(--tabs) + env(safe-area-inset-bottom,0px
 .popchk input{margin-top:.2rem;flex:none}
 .readbar{height:.6rem;border-radius:.3rem;background:var(--line-2);overflow:hidden}
 .readbar span{display:block;height:100%;background:var(--green)}
+
+/* השינויים במערכת (מניהול גורדון) */
+.tl .chgtag{display:inline-flex!important;gap:.35rem;align-items:center;margin-top:.3rem;font-size:.9rem;font-weight:700;color:var(--amber)!important}
+.tl .off b{text-decoration:line-through;text-decoration-thickness:1px;color:var(--muted)}
+.tl .add{background:var(--amber-soft)}
+.chgcard.mine{border-inline-start:4px solid var(--amber)}
+ul.chg{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+ul.chg>li{display:grid;grid-template-columns:3rem 1fr;gap:.8rem;padding:.8rem 1rem;border-bottom:1px solid var(--line-2)}
+ul.chg>li:last-child{border-bottom:0}
+ul.chg .ch{text-align:center;color:var(--muted)}
+ul.chg .ch small{display:block;font-size:.88rem}
+ul.chg .ch b{font-size:1.3rem;color:var(--navy-ink)}
+ul.chg .cw{min-width:0;display:grid;gap:.45rem}
+ul.chg .cls{font-weight:700;color:var(--navy-ink);font-size:1rem}
+ul.chg .ci{display:flex;flex-wrap:wrap;gap:.15rem .6rem;align-items:baseline;padding:.35rem .55rem;border-radius:.6rem;background:var(--bg)}
+ul.chg .ci.mine{background:var(--amber-soft);outline:1px solid var(--amber)}
+ul.chg .ci b{font-weight:600;color:var(--ink)}
+ul.chg .why{font-size:.9rem;color:var(--muted)}
+ul.chg .to{font-size:.94rem;font-weight:600;color:var(--green)}
+ul.chg .to.none{color:var(--red)}
+ul.chg .cnote,.absent{margin:0;font-size:.92rem;color:var(--muted)}
+.daynote{margin:0 0 .6rem!important}

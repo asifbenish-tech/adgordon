@@ -194,6 +194,23 @@ export async function saveDaily(date, doc, notifyTo) {
   if (notifyTo.length) notify({kind: "daily", date, to: notifyTo, text: doc.note || ""});
 }
 export const delDaily = date => del("daily", date);
+// ---- השינויים במערכת מניהול גורדון: changes/<תאריך>, נכתב רק ע"י השרת (server/Code.gs, syncChanges_) ----
+// value = JSON: {date, rows: [{h, cls, items: [{tn, u, subj, why, ev, sub: {name, u}}], overrides?, cancel?, note?, teachers?}], absent, note?, mine: {uid: [{h, cls, k: in|out|cancel, who, subj, note}]}}
+const chgW = {};
+export function watchChanges(date) {
+  if (chgW[date]) return;
+  chgW[date] = watchDoc("changes", date, d => {
+    let v = null;
+    try { v = d && d.value ? Object.assign(JSON.parse(d.value), {at: d.at}) : null; } catch (e) { v = null; }
+    S.changes[date] = v; changed();
+  });
+}
+export const myChanges = date => ((S.changes[date] && S.changes[date].mine) || {})[S.user.uid] || [];
+export function chgText(x) {
+  if (x.k === "in") return "מילוי מקום" + (x.who ? " במקום " + x.who : "") + (x.subj ? " (" + x.subj + ")" : "");
+  if (x.k === "cancel") return "השיעור בוטל" + (x.note && x.note !== "בוטל" ? " · " + x.note : "");
+  return x.who ? "מחליף/ה: " + x.who : "השיעור שלך מוחלף";
+}
 // מבקש משרת הכניסה לשלוח התראת דחיפה לנמענים. לא מעכב ולא מכשיל את השליחה עצמה.
 function notify(msg) { if (!DEMO) idToken().then(t => api(Object.assign({a: "notify", t}, msg))).catch(() => {}); }
 // הערוצים שבהם יושבת הודעה: קהלי היעד + העותק של השולח. הודעת צוות ניהול יושבת רק בערוץ שלו.

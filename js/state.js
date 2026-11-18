@@ -18,6 +18,7 @@ export const S = {
   dining: null,          // סידורי חדר האוכל שלי (dining/<uid>/classes): [{id, name, students, columns, teams, tables, roles, opts, today, hist}]
   diningErr: false,
   toolsDoc: null,        // meta/tools - רשימת האפליקציות בלשונית "כלים"
+  changes: {},           // השינויים במערכת מניהול גורדון: {תאריך: {rows, absent, mine, at} | null}
   daily: {},             // מערכת השינויים: {תאריך: מסמך | null}, נטען רק לימים שמוצגים
   photos: null,          // {uid: "data:image/jpeg;base64,..."} - תמונות הפרופיל
   mgmt: null,            // הודעות צוות הניהול (תיבה נפרדת, רק לחברי הקבוצה)

@@ -7,13 +7,14 @@ const fs = require("fs"), path = require("path"), vm = require("vm"), crypto = r
 const OWNER_H = "a".repeat(64), OTHER_H = "b".repeat(64), REMOVED_H = "c".repeat(64), LIVE_H = "d".repeat(64);
 const ACCESS = {[OWNER_H]: {n: "אסיף", r: "admin", p: 1}, [OTHER_H]: {n: "אנה", r: "teacher"}, [REMOVED_H]: {n: "ארז", r: "teacher"}};
 const LIVE = {ok: true, users: {[LIVE_H]: {n: "לייה", r: "coordinator", h: "A"}}, removed: {[REMOVED_H]: "ארז"}};
+const TT = {app_map: {teachers: {"רותי": {app_id: "tR", full_name: "רותי כהן"}, "אנה": {app_id: "tA", full_name: "אנה זטרברג"}}}, full_names: {}};
 const {privateKey, publicKey} = crypto.generateKeyPairSync("rsa", {modulusLength: 2048});
 const SA = {project_id: "gordon-staff", client_email: "firebase-adminsdk@gordon-staff.iam.gserviceaccount.com",
   private_key: privateKey.export({type: "pkcs8", format: "pem"})};
 
 function makeEnv() {
   const props = {SA_KEY: JSON.stringify(SA)}, cache = {}, mails = [], sheets = {};
-  const fsdb = {}, pushes = [], triggers = [], tokens = {}, valid = {};
+  const fsdb = {}, sgdb = {}, pushes = [], triggers = [], tokens = {}, valid = {};
   // אסימון זיהוי מדומה: מחזיר JWT ש-lookup מכיר. forge = אותו גוף, אבל Google לא מכירה אותו
   const mint = (uid, claims) => { const t = "h." + Buffer.from(JSON.stringify(Object.assign({user_id: uid}, claims))).toString("base64url") + ".s" + Object.keys(valid).length; valid[t] = uid; return t; };   // Firestore מדומה: {"col/id": fields}; התראות שנשלחו; אסימוני משתמשים
   let now = Date.parse("2026-10-25T08:00:00Z");
@@ -46,6 +47,12 @@ function makeEnv() {
     UrlFetchApp: {fetchAll(reqs) { return reqs.map(q => this.fetch(q.url, q)); }, fetch(url, opt) {
       const res = (code, o) => ({getResponseCode: () => code, getContentText: () => JSON.stringify(o)});
       if (url.includes("access_map.json")) return res(200, ACCESS);
+      if (url.includes("timetable.json")) return res(200, TT);
+      if (url.includes("projects/school-gordon/")) {   // ניהול גורדון: קריאה בלבד
+        assert.strictEqual(opt.headers.Authorization, "Bearer AT"); assert.ok(!opt.method || opt.method === "get", "never writes to school-gordon");
+        const k = decodeURIComponent(url.split("/documents/")[1]);
+        return sgdb[k] ? res(200, {name: k, fields: sgdb[k]}) : res(404, {error: {status: "NOT_FOUND"}});
+      }
       if (url.includes("script.google.com")) return res(200, LIVE);
       if (url.includes("signInWithCustomToken")) {
         const tok = JSON.parse(opt.payload).token, [h, b, s] = tok.split(".");
@@ -94,7 +101,7 @@ function makeEnv() {
   vm.createContext(env);
   vm.runInContext(fs.readFileSync(path.join(__dirname, "Code.gs"), "utf8") + "\nOWNER_HASH = " + JSON.stringify(OWNER_H) + ";", env);
   const post = body => JSON.parse(env.doPost({postData: {contents: JSON.stringify(body)}}).text);
-  return {env, post, mails, sheets, props, fsdb, pushes, triggers, tokens, mint, tick: ms => { now += ms; }, setNow: t => { now = Date.parse(t); }, clearCache: () => { for (const k in cache) delete cache[k]; }};
+  return {env, post, mails, sheets, props, fsdb, sgdb, pushes, triggers, tokens, mint, tick: ms => { now += ms; }, setNow: t => { now = Date.parse(t); }, clearCache: () => { for (const k in cache) delete cache[k]; }};
 }
 
 const T = makeEnv();
@@ -316,5 +323,40 @@ W.fsdb["staff/" + uid("רותי")].groups = L(["hA", "mgmt"]);
 assert.strictEqual(W.pushes[0].data.url, "#/daily");
 W.clearCache(); for (let i = 0; i < 60; i++) W.post({a: "notify", t: rutiTok, kind: "chat", to: uid("חסן"), text: "x"});
 assert.match(W.post({a: "notify", t: rutiTok, kind: "chat", to: uid("חסן"), text: "x"}).error, /יותר מדי/, "rate limit per sender");
+
+// ---- השינויים במערכת מניהול גורדון ----
+const sgSnap = rows => ({value: S1(JSON.stringify({date: "2026-11-12", rows, absent: [{t: "tR", tn: "רותי כהן", hours: null}]}))});
+const R3 = {h: 3, classId: "c1", cls: "ז1", items: [{t: "tR", tn: "רותי כהן", subj: "מתמטיקה", why: "absent", ev: "", sub: {id: "tA", name: "אנה ז"}}]};
+const R5 = {h: 5, classId: "c2", cls: "ח2", items: [], cancel: "בוטל", teachers: [{t: "tH", tn: "חסן"}]};
+W.sgdb["schools/main/config/staffapp_changes_2026-11-12"] = sgSnap([R3, R5]);
+W.fsdb["staff/" + uid("רותי")].groups = L(["hA"]);
+assert.strictEqual(at("2026-11-12T08:00:00+02:00"), 0, "no SG_KEY: nothing is read");
+assert.ok(!W.fsdb["changes/2026-11-12"]);
+W.props.SG_KEY = JSON.stringify(Object.assign({}, SA, {project_id: "school-gordon"}));
+assert.strictEqual(at("2026-11-12T08:00:00+02:00"), 3, "each affected teacher gets a personal alert");
+const pd = () => Object.fromEntries(W.pushes.filter(m => m.token !== "dead").map(m => [m.token, m.data]));
+assert.deepStrictEqual(pd(), {
+  tokA: {title: "שינוי במערכת שלך היום", body: "שעה 3 · ז1 · מחליף/ה: אנה ז", url: "#/changes/2026-11-12"},
+  tokAnna: {title: "שינוי במערכת שלך היום", body: "שעה 3 · ז1 · מילוי מקום במקום רותי כהן (מתמטיקה)", url: "#/changes/2026-11-12"},
+  tokHasan: {title: "שינוי במערכת שלך היום", body: "שעה 5 · ח2 · השיעור בוטל", url: "#/changes/2026-11-12"}});
+const chg = () => JSON.parse(W.fsdb["changes/2026-11-12"].value.stringValue);
+assert.strictEqual(chg().rows[0].items[0].u, uid("רותי"), "matched by the id in the timetable's app_map");
+assert.strictEqual(chg().rows[0].items[0].sub.u, uid("אנה"));
+assert.strictEqual(chg().rows[1].teachers[0].u, uid("חסן"), "no app id: matched by name in the staff list");
+assert.strictEqual(chg().absent[0].u, uid("רותי"));
+assert.deepStrictEqual(Object.keys(chg().mine).sort(), [uid("רותי"), uid("אנה"), uid("חסן")].sort());
+assert.strictEqual(at("2026-11-12T08:05:00+02:00"), 0, "same changes: no second alert"); assert.strictEqual(W.pushes.length, 0);
+W.sgdb["schools/main/config/staffapp_changes_2026-11-12"] = sgSnap([R3]);
+assert.strictEqual(at("2026-11-12T08:10:00+02:00"), 1, "only the teacher whose change went away");
+assert.deepStrictEqual(pd(), {tokHasan: {title: "עדכון במערכת שלך היום", body: "השינוי שהיה לך בוטל", url: "#/changes/2026-11-12"}});
+// מחר (יום ו' -> הבא אחריו), בערב: נשמר בלי התראה
+W.sgdb["schools/main/config/staffapp_changes_2026-11-13"] = sgSnap([R5]);
+assert.strictEqual(at("2026-11-12T21:30:00+02:00"), 0, "late evening: saved quietly");
+assert.ok(W.fsdb["changes/2026-11-13"], "the next school day is read too");
+W.sgdb["schools/main/config/staffapp_changes_2026-11-15"] = sgSnap([R5]);
+assert.strictEqual(at("2026-11-13T18:00:00+02:00"), 1, "friday: the next school day is sunday");
+assert.strictEqual(pd().tokHasan.title, "שינוי במערכת שלך ל-15.11");
+W.props.SG_KEY = JSON.stringify(Object.assign({}, SA, {project_id: "other"}));
+assert.strictEqual(at("2026-11-12T08:00:00+02:00"), 0, "a key of another project is refused, without breaking tick");
 
 console.log("server/Code.gs: all checks passed");

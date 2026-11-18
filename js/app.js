@@ -17,11 +17,12 @@ import menu from "./views/menu.js";
 import {portal, bank} from "./views/portal.js";
 import tools from "./views/tools.js";
 import daily from "./views/daily.js";
+import changes from "./views/changes.js";
 import reads from "./views/reads.js";
 import seat from "./views/seat.js";
 import dining from "./views/dining.js";
 
-const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: menu, edit: profile, portal, bank, tools, seat, dining, daily, reads};
+const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: menu, edit: profile, portal, bank, tools, seat, dining, daily, changes, reads};
 // המערכת והשמירות נמצאות באזור האישי (לחיצה על התמונה למעלה)
 const TABS = [["home", "היום", "fa-sun"], ["msg", "הודעות", "fa-comments"], ["new", "צוות", "fa-address-book"], ["portal", "מידע", "fa-book-open"], ["tools", "כלים", "fa-grip"]];
 let last = "";

@@ -37,7 +37,7 @@ https://asifbenish-tech.github.io/adgordon/
 | `js/store.js` | שכבת נתונים אחת לשני מצבים: Firestore / הדגמה ב-localStorage (`watch`, `put`, `del`) |
 | `js/data.js` | כל ההאזנות והפעולות: צוות, קבוצות, לוח הודעות, שיחות, שמירות, אירועים |
 | `js/auth.js` | כניסה: ת"ז -> גיבוב PBKDF2 במכשיר -> קוד במייל -> אסימון Firebase |
-| `js/app.js` | מעטפת וניווט (`#/home`, `#/msg`, `#/chat/<uid>`, `#/new`, `#/cal`, `#/portal`, `#/bank/<id>`, `#/me`, `#/tt`, `#/duty`, `#/edit`, `#/staff`, `#/tools`, `#/seat`, `#/dining`, `#/daily/<תאריך>`, `#/reads/<mid>`) |
+| `js/app.js` | מעטפת וניווט (`#/home`, `#/msg`, `#/chat/<uid>`, `#/new`, `#/cal`, `#/portal`, `#/bank/<id>`, `#/me`, `#/tt`, `#/duty`, `#/edit`, `#/staff`, `#/tools`, `#/seat`, `#/dining`, `#/daily/<תאריך>`, `#/changes/<תאריך>`, `#/reads/<mid>`) |
 | `data/duty.json` | לוח תורנות השמירה (עותק של הגיליון של רכז התורנויות) |
 | `logo.png` | סמל בית החינוך (מוצג בכניסה ובסרגל; אם חסר - האפליקציה מסתדרת בלעדיו) |
 | `js/seat-io.js` | סידור ישיבה: קריאת רשימת תלמידים מקובץ (docx/xlsx/pdf/txt/csv) ויצירת PDF להדפסה, בלי ספריות |
@@ -130,6 +130,16 @@ https://asifbenish-tech.github.io/adgordon/
 - **הודעה קופצת** (`pop: true` על הודעת לוח): רק הנהלה/צוות ניהול (נאכף בכללים ובשרת). קופצת בחלון מעל כל מסך (`#pop`, `popCheck` ב-`app.js`)
   לכל נמען עד "קראתי" (3 ימים אחורה), נשלחת כהתראה "הודעה דחופה". אישור = `popreads/<mid>/u/<uid>` (+ סימון במכשיר).
   "מי קרא" (`#/reads/<mid>`) פתוח לשולח, להנהלה ולצוות הניהול: קראו / עוד לא קראו מתוך קהל היעד (`audienceOf`).
+
+## השינויים במערכת מניהול גורדון (school-gordon)
+
+- המסך "יומי" בניהול גורדון שומר תקציר ב-`schools/main/config/staffapp_changes_<תאריך>` (`src/lib/staffChanges.js` בריפו school-app).
+- `tick()` בשרת (`changesTick_`/`syncChanges_`) קורא אותו להיום וליום הלימודים הבא, 6:30-22:00 (גם במוצאי שבת), עם מפתח קריאה בלבד `SG_KEY` במאפייני הסקריפט.
+  בלי `SG_KEY` - לא קורה כלום. מזהי המורים מתורגמים ל-uid דרך `app_map.teachers` ב-timetable.json, ואם אין - לפי שם/שם מלא/כינוי.
+- נכתב ל-`changes/<תאריך>` = `{value: JSON (rows, absent, mine: {uid: [{h, cls, k: in|out|cancel, who, subj}]}), sig, src, at}`. רק השרת כותב.
+- התראה אישית רק למי שהשינויים **שלו** השתנו (וגם "השינוי שהיה לך בוטל"). התראות 6:30-21:00, בשבת רק מ-19:00.
+- באפליקציה: בציר "היום שלי" (שיעור מוחלף מסומן, מילוי מקום נוסף לציר), כרטיס במסך הבית, ומסך מלא `#/changes/<תאריך>` (`js/views/changes.js`).
+  תמונת מערכת השינויים (`#/daily`) נשארת כגיבוי.
 
 ## אובייקט אנשי הצוות (`staff/<uid>`)
 

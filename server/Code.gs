@@ -50,7 +50,7 @@ function setup() {
     (added ? "נוספו לגיליון " + added + " שמות חדשים.\n" : "") +
     (mine ? "קוד הכניסה של " + mine + " יישלח ל-" + owner_() + " (אפשר לשנות בגיליון).\n" : "") +
     (missing ? "חסר מייל ל-" + missing + " אנשי צוות - הם לא יוכלו להיכנס עד שימולא.\n" : "לכל אנשי הצוות יש מייל.\n") +
-    "\nבדיקת החיבור ל-Firebase: " + test + "\nבדיקת הקריאה ממאגר הצוות: " + fst + "\nהתראות על שמירות (בדיקה כל 5 דקות): " + trig + "\n");
+    "\nבדיקת החיבור ל-Firebase: " + test + "\nבדיקת הקריאה ממאגר הצוות: " + fst + "\nהתראות על שמירות (בדיקה כל 5 דקות): " + trig + "\nהשינויים במערכת מניהול גורדון: " + sgTest_() + "\n");
   Logger.log("sheet: " + url + " | added: " + added + " | missing emails: " + missing + " | firebase: " + test);
 }
 
@@ -199,16 +199,19 @@ function whoIs_(idToken) {
 // ---- Firestore ו-FCM דרך REST, עם אסימון של חשבון השירות ----
 var FS = "https://firestore.googleapis.com/v1/projects/" + PROJECT_ID + "/databases/(default)/documents/";
 function oauth_() {
-  var c = CacheService.getScriptCache(), hit = c.get("oauth");
+  return CacheService.getScriptCache().get("oauth") || saToken_(saKey_(), "oauth", "https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/firebase.messaging");
+}
+// אסימון גישה של חשבון שירות (במטמון כמעט שעה)
+function saToken_(sa, ck, scope) {
+  var c = CacheService.getScriptCache(), hit = c.get(ck);
   if (hit) return hit;
-  var sa = saKey_(), now = Math.floor(Date.now() / 1000);
-  var input = b64_(JSON.stringify({alg: "RS256", typ: "JWT"})) + "." + b64_(JSON.stringify({iss: sa.client_email, aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600,
-    scope: "https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/firebase.messaging"}));
+  var now = Math.floor(Date.now() / 1000);
+  var input = b64_(JSON.stringify({alg: "RS256", typ: "JWT"})) + "." + b64_(JSON.stringify({iss: sa.client_email, aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600, scope: scope}));
   var r = UrlFetchApp.fetch("https://oauth2.googleapis.com/token", {method: "post", muteHttpExceptions: true,
     payload: {grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: input + "." + b64_(Utilities.computeRsaSha256Signature(input, sa.private_key))}});
   var j = JSON.parse(r.getContentText());
   if (!j.access_token) throw new Error("חשבון השירות לא קיבל גישה: " + (j.error_description || j.error || r.getResponseCode()));
-  c.put("oauth", j.access_token, 3000);
+  c.put(ck, j.access_token, 3000);
   return j.access_token;
 }
 function fsDec_(v) {
@@ -260,7 +263,9 @@ var LEAD_MIN = 5, LEAD_MAX = 12, LATE_MIN = 5, LATE_MAX = 10, SEC_GROUP = "sec";
 function tick() {
   var p = Utilities.formatDate(new Date(), "Asia/Jerusalem", "u|HH|mm|yyyy-MM-dd").split("|");
   var day = Number(p[0]) % 7, mins = Number(p[1]) * 60 + Number(p[2]), sent = 0;   // u: שני=1 ... ראשון=7 -> ראשון=0
-  if (day === 6 || mins < 6 * 60 + 30 || mins > 16 * 60) return 0;
+  if (mins < 6 * 60 + 30 || mins > CHG_UNTIL) return 0;
+  sent += changesTick_(p[3], day, mins);   // השינויים במערכת: גם בערב ובמוצאי שבת (ליום הלימודים הבא)
+  if (day === 6 || mins > 16 * 60) return sent;
   var c = CacheService.getScriptCache(), docs = fsList_("push"), sec = null;
   var once = function (key) { if (c.get(key)) return false; c.put(key, "1", 3600); return true; };
   var toAll = function (d, title, body) { Object.keys(d.tokens || {}).forEach(function (tok) { if (push_(tok, title, body, "#/duty")) sent++; }); };
@@ -289,6 +294,126 @@ function secTokens_(pushDocs) {
   fsList_("staff").forEach(function (x) { if (!x.off && !x.removed && (x.groups || []).indexOf(SEC_GROUP) >= 0) ids[x.id] = 1; });
   pushDocs.forEach(function (d) { if (ids[d.id]) out = out.concat(Object.keys(d.tokens || {})); });
   return out;
+}
+
+// ---- השינויים במערכת, ישר מאפליקציית ניהול גורדון (school-gordon) ----
+// המסך "יומי" שם שומר תקציר של השינויים ב-schools/main/config/staffapp_changes_<תאריך> (src/lib/staffChanges.js בריפו school-app).
+// tick קורא אותו להיום וליום הלימודים הבא, מתרגם את מזהי המורים שם לאנשי הצוות כאן (app_map בלוח המערכות, ואם אין - לפי שם),
+// כותב ל-changes/<תאריך> = {date, value: JSON של התקציר + mine: {uid: [שינויים]}, sig: {uid: חתימה}, src, at},
+// ושולח התראה אישית רק למי שהשינויים שלו השתנו מאז הפעם הקודמת.
+// דורש מאפיין סקריפט SG_KEY = מפתח חשבון שירות של school-gordon עם הרשאת קריאה בלבד (Cloud Datastore Viewer). בלעדיו - לא עושה כלום.
+function sgTest_() {
+  try {
+    var sa = sgKey_();
+    if (!sa) return "לא מחובר (אין SG_KEY) - השינויים לא יופיעו באפליקציה";
+    var r = UrlFetchApp.fetch(SG_FS + "schools/main/config/staffapp_changes_0000-00-00", {headers: {Authorization: "Bearer " + saToken_(sa, "sgoauth", "https://www.googleapis.com/auth/datastore")}, muteHttpExceptions: true});
+    return r.getResponseCode() === 404 || r.getResponseCode() === 200 ? "עובד ✓" : "נכשל - " + r.getResponseCode() + " (לבדוק שלחשבון השירות יש הרשאת Cloud Datastore Viewer)";
+  } catch (err) { return "נכשל - " + err.message; }
+}
+var SG_PROJECT = "school-gordon", CHG_UNTIL = 22 * 60, CHG_PUSH = [6 * 60 + 30, 21 * 60];
+var SG_FS = "https://firestore.googleapis.com/v1/projects/" + SG_PROJECT + "/databases/(default)/documents/";
+var TT_URL = "https://raw.githubusercontent.com/asifbenish-tech/gordon-timetable/master/timetable.json";
+function sgKey_() {
+  var raw = PropertiesService.getScriptProperties().getProperty("SG_KEY"), sa;
+  if (!raw) return null;
+  try { sa = JSON.parse(raw); } catch (err) { throw new Error("SG_KEY אינו JSON תקין - להדביק את כל תוכן הקובץ שהורד"); }
+  if (sa.project_id !== SG_PROJECT) throw new Error("SG_KEY שייך לפרויקט " + sa.project_id + " ולא ל-" + SG_PROJECT);
+  return sa;
+}
+function changesTick_(date, day, mins) {
+  var sa, sent = 0;
+  try { sa = sgKey_(); } catch (err) { logOnce_("sgkey", err.message); return 0; }
+  if (!sa) return 0;
+  var next = new Date(Date.parse(date + "T12:00:00Z") + (day === 5 ? 2 : 1) * 86400000).toISOString().slice(0, 10);
+  [date, next].forEach(function (d) {
+    try { sent += syncChanges_(d, sa, mins >= CHG_PUSH[0] && mins <= CHG_PUSH[1] && (day !== 6 || mins >= 19 * 60)); }
+    catch (err) { logOnce_("sg_" + d, err.message); }
+  });
+  return sent;
+}
+function logOnce_(k, msg) { var c = CacheService.getScriptCache(); if (!c.get("e_" + k)) { c.put("e_" + k, "1", 3600); log_("error", k, msg); } }
+function syncChanges_(date, sa, canPush) {
+  var c = CacheService.getScriptCache();
+  var r = UrlFetchApp.fetch(SG_FS + "schools/main/config/staffapp_changes_" + date, {headers: {Authorization: "Bearer " + saToken_(sa, "sgoauth", "https://www.googleapis.com/auth/datastore")}, muteHttpExceptions: true});
+  if (r.getResponseCode() === 404) return 0;   // אין תקציר ליום הזה (עוד לא נפתח המסך היומי)
+  if (r.getResponseCode() !== 200) throw new Error("קריאה מניהול גורדון נכשלה: " + r.getResponseCode());
+  var raw = fsObj_(JSON.parse(r.getContentText()).fields || {}).value || "", src = digest_(raw);
+  if (c.get("sgv_" + date) === src) return 0;
+  var old = fsGet_("changes/" + date);
+  if (old && old.src === src) { c.put("sgv_" + date, src, 21600); return 0; }
+  var snap = JSON.parse(raw), map = teacherMap_(), mine = {}, sig = {};
+  var u = function (id, name) { return (id && map.byId[id]) || (name && map.byName[norm_(name)]) || ""; };
+  var add = function (uid, x) { if (uid) (mine[uid] = mine[uid] || []).push(x); };
+  (snap.rows || []).forEach(function (row) {
+    var base = {h: row.h, cls: row.cls};
+    (row.items || []).forEach(function (it) {
+      it.u = u(it.t, it.tn); if (it.sub) it.sub.u = u(it.sub.id, it.sub.name);
+      add(it.u, ext_(base, {k: "out", who: it.sub ? it.sub.name : "", subj: it.subj, why: it.why}));
+      if (it.sub) add(it.sub.u, ext_(base, {k: "in", who: it.tn, subj: it.subj}));
+    });
+    (row.overrides || []).forEach(function (o) {
+      o.u = u(o.t, o.tn); o.sub.u = u(o.sub.id, o.sub.name);
+      if (o.u !== o.sub.u) add(o.u, ext_(base, {k: "out", who: o.sub.name, subj: o.subj}));
+      add(o.sub.u, ext_(base, {k: "in", who: o.tn, subj: o.subj, note: o.note}));
+    });
+    if (row.cancel) (row.teachers || []).forEach(function (t) { t.u = u(t.t, t.tn); add(t.u, ext_(base, {k: "cancel", note: row.cancel})); });
+  });
+  (snap.absent || []).forEach(function (a) { a.u = u(a.t, a.tn); });
+  snap.mine = mine;
+  Object.keys(mine).forEach(function (id) { sig[id] = digest_(JSON.stringify(mine[id])).slice(0, 16); });
+  fsPatch_("changes/" + date, {date: date, value: JSON.stringify(snap), sig: sig, src: src, at: Date.now()});
+  c.put("sgv_" + date, src, 21600);
+  if (!canPush) return 0;
+  // התראה: למי שיש לו שינוי חדש/אחר, ולמי שהשינוי שלו בוטל
+  var before = (old && old.sig) || {}, who = {};
+  Object.keys(sig).forEach(function (id) { if (before[id] !== sig[id]) who[id] = 1; });
+  Object.keys(before).forEach(function (id) { if (!sig[id]) who[id] = 1; });
+  if (!Object.keys(who).length) return 0;
+  var staff = {}, reqs = [], when = date === Utilities.formatDate(new Date(), "Asia/Jerusalem", "u|HH|mm|yyyy-MM-dd").split("|")[3] ? "היום" : "ל-" + date.split("-").reverse().slice(0, 2).join(".");
+  fsList_("staff").forEach(function (x) { staff[x.id] = x; });
+  fsList_("push").forEach(function (d) {
+    if (!who[d.id] || !staff[d.id] || staff[d.id].off || staff[d.id].removed) return;
+    var list = mine[d.id] || [], title = list.length ? "שינוי במערכת שלך " + when : "עדכון במערכת שלך " + when;
+    var body = list.length ? chgLine_(list[0]) + (list.length > 1 ? " · ועוד " + (list.length - 1) : "") : "השינוי שהיה לך בוטל";
+    Object.keys(d.tokens || {}).forEach(function (tok) { reqs.push(pushReq_(tok, title, body, "#/changes/" + date)); });
+  });
+  if (!reqs.length) return 0;
+  return UrlFetchApp.fetchAll(reqs).filter(function (x) { return x.getResponseCode() === 200; }).length;
+}
+function ext_(a, b) { var o = {}; Object.keys(a).forEach(function (k) { o[k] = a[k]; }); Object.keys(b).forEach(function (k) { if (b[k] !== undefined && b[k] !== "") o[k] = b[k]; }); return o; }
+function chgLine_(x) {
+  var at = "שעה " + x.h + " · " + x.cls + " · ";
+  if (x.k === "in") return at + "מילוי מקום" + (x.who ? " במקום " + x.who : "") + (x.subj ? " (" + x.subj + ")" : "");
+  if (x.k === "cancel") return at + "השיעור בוטל";
+  return at + (x.who ? "מחליף/ה: " + x.who : "השיעור שלך מוחלף");
+}
+function norm_(s) { return String(s || "").replace(/["'׳״\s]+/g, " ").trim(); }
+// מזהי המורים בניהול גורדון -> uid כאן. app_map.teachers בלוח המערכות: {שם בלוח: {app_id, full_name}}.
+// ואם אין התאמה - לפי שם: השם בלוח, שם מלא, או כינוי ממאגר הצוות.
+function teacherMap_() {
+  var c = CacheService.getScriptCache(), hit = c.get("tmap");
+  if (hit) return JSON.parse(hit);
+  var m = {byId: {}, byName: {}}, tt = {};
+  try { tt = JSON.parse(UrlFetchApp.fetch(TT_URL, {muteHttpExceptions: true}).getContentText()); } catch (err) {}
+  var at = (tt.app_map && tt.app_map.teachers) || {};
+  Object.keys(at).forEach(function (n) {
+    var id = uidOf_(n);
+    if (at[n] && at[n].app_id) m.byId[at[n].app_id] = id;
+    m.byName[norm_(n)] = id; if (at[n] && at[n].full_name) m.byName[norm_(at[n].full_name)] = id;
+  });
+  Object.keys(tt.full_names || {}).forEach(function (n) { m.byName[norm_(tt.full_names[n])] = m.byName[norm_(tt.full_names[n])] || uidOf_(n); });
+  fsList_("staff").forEach(function (x) {
+    if (x.removed) return;
+    [x.name, x.full].concat(x.aliases || []).forEach(function (n) { if (n) m.byName[norm_(n)] = x.id; });
+  });
+  c.put("tmap", JSON.stringify(m), 3600);
+  return m;
+}
+function fsGet_(path) {
+  var r = UrlFetchApp.fetch(FS + path, {headers: {Authorization: "Bearer " + oauth_()}, muteHttpExceptions: true});
+  if (r.getResponseCode() === 404) return null;
+  if (r.getResponseCode() !== 200) throw new Error("קריאה מ-Firestore נכשלה (" + path + "): " + r.getResponseCode());
+  return fsObj_(JSON.parse(r.getContentText()).fields || {});
 }
 
 // ---- התראה על הודעה חדשה. האפליקציה של השולח קוראת לזה מיד אחרי השליחה: {a:"notify", t:<אסימון>, kind, to, title, text} ----

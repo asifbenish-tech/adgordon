@@ -4,10 +4,11 @@
 import {S} from "../state.js";
 import {BELLS} from "../config.js";
 import {$, esc, iso, today, parse, DAYN} from "../util.js";
-import {isAdmin, myFull, myDuty, dutyNow, checkIn, checkedIn, allDays, unreadChats, unreadBoard, unreadMgmt} from "../data.js";
+import {isAdmin, myFull, myDuty, dutyNow, checkIn, checkedIn, allDays, unreadChats, unreadBoard, unreadMgmt, watchChanges, myChanges, chgText} from "../data.js";
 import {loading, empty, secHead, ui, tryDo} from "../ui.js";
 import {slots} from "./tt.js";
 import {dailyCard} from "./daily.js";
+import {changesCard} from "./changes.js";
 
 const SIDES = {"יסודי": "#2c8a7e", "חטיבה": "#2f6fd1", 'תל"ן': "#c98a12", "מגמות": "#cf4b3a", "סדירות": "#6c5fbf"};
 const ICON = {vac: "fa-umbrella-beach", trip: "fa-person-hiking", event: "fa-star"};
@@ -23,19 +24,22 @@ function week() {
 
 // כל הפריטים עם שעה ביום שנבחר: שיעורים, שעות פנויות ביניהם, שמירות. ממוינים לפי שעה.
 function timeline(date) {
-  const day = parse(date).getDay(), out = [];
+  const day = parse(date).getDay(), out = [], chg = myChanges(date), at = h => BELLS[h] || ["", ""];
+  const ins = chg.filter(x => x.k === "in"), outs = h => chg.filter(x => x.k !== "in" && x.h === h);
   for (const s of S.T ? slots(S.user.name, day) : []) {
-    const b = BELLS[s.h] || ["", ""];
+    const b = at(s.h), o = outs(s.h);
+    if (!s.ev.length && ins.some(x => x.h === s.h)) continue;   // השעה הפנויה התמלאה - מופיעה למטה כמילוי מקום
     out.push(s.ev.length
-      ? {from: b[0], to: b[1], kind: "lesson", title: s.ev.map(e => e[3]).join(" · "), sub: "שעה " + s.h, side: s.ev[0][0]}
+      ? {from: b[0], to: b[1], kind: "lesson", title: s.ev.map(e => e[3]).join(" · "), sub: "שעה " + s.h, side: s.ev[0][0], chg: o.map(chgText).join(" · "), off: o.length > 0}
       : {from: b[0], to: b[1], kind: "free", title: "שעה פנויה", sub: "שעה " + s.h});
   }
+  for (const x of ins) out.push({from: at(x.h)[0], to: at(x.h)[1], kind: "lesson", title: "מילוי מקום · " + x.cls, sub: "שעה " + x.h, chg: chgText(x), add: true});
   for (const x of myDuty().filter(x => x.day === day)) out.push({from: x.from, to: x.to, kind: "duty", title: "שמירה · " + x.places.join(" + "), sub: "עד " + t(x.to), slot: x});
   return out.sort((a, b) => (a.from || "99").localeCompare(b.from || "99"));
 }
 
 function rowHtml(x, isToday) {
-  const now = hm(), cls = [x.kind === "duty" ? "du" : x.kind === "free" ? "free" : ""];
+  const now = hm(), cls = [x.kind === "duty" ? "du" : x.kind === "free" ? "free" : "", x.off ? "off" : "", x.add ? "add" : ""];
   const nowItem = isToday && x.from && x.from <= now && now < x.to;
   if (isToday && x.to && x.to <= now && x.kind !== "duty") cls.push("past");
   if (nowItem && x.kind !== "duty") cls.push("now");
@@ -45,7 +49,8 @@ function rowHtml(x, isToday) {
     if (done) extra = '<span class="done"><i class="fa-solid fa-circle-check"></i> אישרת הגעה</span>';
     else if (mine) extra = '<button type="button" class="btn gold" id="arrive">הגעתי לשמירה</button>';
   }
-  return '<li class="' + cls.join(" ") + '"><time>' + esc(t(x.from)) + "</time><div><b>" + esc(x.title) + (nowItem && x.kind !== "duty" ? '<span class="nowtag">עכשיו</span>' : "") + "</b>" +
+  return '<li class="' + cls.filter(Boolean).join(" ") + '"><time>' + esc(t(x.from)) + "</time><div><b>" + esc(x.title) + (nowItem && x.kind !== "duty" ? '<span class="nowtag">עכשיו</span>' : "") + "</b>" +
+    (x.chg ? '<span class="chgtag"><i class="fa-solid fa-shuffle"></i> ' + esc(x.chg) + "</span>" : "") +
     "<span>" + esc(x.sub) + (x.side ? ' <span class="tag" style="--t:' + (SIDES[x.side] || "#5b6880") + '">' + esc(x.side === "סדירות" ? "פגישה" : x.side) + "</span>" : "") + "</span>" + extra + "</div></li>";
 }
 
@@ -71,6 +76,8 @@ export default {
     const un = unreadBoard() + unreadChats() + unreadMgmt(), last = S.board && S.board[0];
     if (un) h += '<a class="alert" href="#/msg"><i class="fa-solid fa-envelope"></i><span><b>' + (un === 1 ? "הודעה חדשה" : un + " הודעות חדשות") + "</b>" + (last ? " · " + esc(last.title) : "") + '</span><i class="fa-solid fa-chevron-left go"></i></a>';
     const isToday = sel === today(), d = parse(sel), c = cal && cal.find(x => x.date === sel);
+    watchChanges(sel);
+    h += changesCard(sel);
     h += dailyCard(sel);
     h += allDayHtml(c);
     h += secHead(isToday ? "היום שלי" : "יום " + DAYN[d.getDay()] + " " + d.getDate() + "." + (d.getMonth() + 1), "#/tt", "המערכת השבועית");

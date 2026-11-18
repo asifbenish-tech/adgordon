@@ -96,6 +96,8 @@ await t("daily must be a jpeg", no(setDoc(doc(A, "daily/2026-11-19"), Object.ass
 await t("daily id must be a date", no(setDoc(doc(A, "daily/hello"), Object.assign({by: "t_admin"}, dimg))));
 await t("teacher cannot delete the daily changes", no(deleteDoc(doc(T2, "daily/2026-11-18"))));
 await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(), "staff/t_mg"), {name: "t_mg", groups: ["mgmt"]}));
+await t("everyone reads the timetable changes", ok(getDoc(doc(T2, "changes/2026-11-18"))));
+await t("nobody writes the timetable changes, not even admin", no(setDoc(doc(A, "changes/2026-11-18"), {value: "{}"})));
 await t("mgmt member uploads the daily changes", ok(setDoc(doc(db("t_mg", "teacher"), "daily/2026-11-20"), Object.assign({by: "t_mg"}, dimg))));
 await t("mgmt member sends a pop-up", ok(setDoc(doc(db("t_mg", "teacher"), "channels/all/msgs/p4"), Object.assign(m("t_mg"), {pop: true}))));
 // תמונות פרופיל

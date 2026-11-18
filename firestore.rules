@@ -96,6 +96,8 @@ service cloud.firestore {
         && request.resource.data.by == request.auth.uid;
       allow delete: if staff() && (admin() || inGroup('mgmt'));
     }
+    // השינויים במערכת מניהול גורדון: רק שרת הכניסה כותב (חשבון שירות, עוקף את הכללים)
+    match /changes/{date} { allow read: if staff(); allow write: if false; }
     match /meta/{id}   { allow read: if staff(); allow write: if admin(); }
     match /duties/{id} { allow read: if staff(); allow write: if admin(); }
     match /events/{id} { allow read: if staff(); allow write: if admin(); }
