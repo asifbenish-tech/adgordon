@@ -82,6 +82,20 @@ service cloud.firestore {
         && request.resource.data.roles is list && request.resource.data.roles.size() <= 20
         && (!('hist' in request.resource.data) || request.resource.data.hist.size() <= 400);
     }
+    // הודעה קופצת: כל נמען מאשר שקרא (רק בשם עצמו). רואים את הרשימה: הוא עצמו, ההנהלה וצוות הניהול.
+    match /popreads/{mid}/u/{uid} {
+      allow read: if staff() && (uid == request.auth.uid || admin() || inGroup('mgmt'));
+      allow create, update: if staff() && uid == request.auth.uid && request.resource.data.keys().hasOnly(['at', 'name']);
+    }
+    // מערכת השינויים היומית: כולם רואים; מעלים/מחליפים/מוחקים הנהלה וצוות ניהול. JPEG קטן כטקסט (מסמך עד 1MB).
+    match /daily/{date} {
+      allow read: if staff();
+      allow create, update: if staff() && (admin() || inGroup('mgmt')) && date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.data is string && request.resource.data.data.size() < 1000000
+        && request.resource.data.data.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')
+        && request.resource.data.by == request.auth.uid;
+      allow delete: if staff() && (admin() || inGroup('mgmt'));
+    }
     match /meta/{id}   { allow read: if staff(); allow write: if admin(); }
     match /duties/{id} { allow read: if staff(); allow write: if admin(); }
     match /events/{id} { allow read: if staff(); allow write: if admin(); }
@@ -93,6 +107,7 @@ service cloud.firestore {
       allow read: if staff() && (ch == 'mgmt' ? inGroup('mgmt') : (ch == 'all' || ch == 's_' + request.auth.uid || admin() || inGroup(ch)));
       allow create: if staff() && request.resource.data.by == request.auth.uid
         && (ch != 'mgmt' || inGroup('mgmt'))
+        && (request.resource.data.get('pop', false) != true || admin() || inGroup('mgmt'))
         && (ch.size() < 2 || ch[0:2] != 's_' || ch == 's_' + request.auth.uid);
       allow delete: if staff() && (ch != 'mgmt' || inGroup('mgmt')) && (resource.data.by == request.auth.uid || admin());
     }

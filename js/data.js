@@ -161,11 +161,39 @@ function merge() {
   S.board = all.filter(x => !isM(x)); S.mgmt = all.filter(isM);
   changed();
 }
-export async function sendBoard(title, body, to) {
-  const mid = rid(), doc = {mid, title, body, to, by: S.user.uid, byName: myFull(), at: Date.now()};
+// pop = הודעה קופצת (רק הנהלה/צוות ניהול): קופצת לכל נמען במסך עד שהוא מאשר שקרא, ונשלחת כהתראה "דחופה"
+export async function sendBoard(title, body, to, pop) {
+  const mid = rid(), doc = Object.assign({mid, title, body, to, by: S.user.uid, byName: myFull(), at: Date.now()}, pop ? {pop: true} : {});
   await Promise.all(chansOf(doc).map(ch => put("channels/" + ch + "/msgs", mid, doc)));
-  notify(to.includes(MGMT) ? {kind: "mgmt", title, text: body} : {kind: "board", to, title, text: body});
+  notify(Object.assign(to.includes(MGMT) ? {kind: "mgmt", title, text: body} : {kind: "board", to, title, text: body}, pop ? {pop: true} : {}));
 }
+// מי מפרסם: הודעות קופצות ומערכת השינויים - הנהלה או צוות ניהול
+export const canPublish = () => isAdmin() || isMgmt();
+
+// ---- הודעות קופצות: מה עוד לא אושר אצלי (3 ימים אחורה, כדי שמי שנכנס לראשונה לא יקבל ערימה) ----
+const popSeen = () => ls("adgPopSeen") || [];
+export const popPending = () => [...(S.board || []), ...(S.mgmt || [])]
+  .filter(m => m.pop && m.by !== S.user.uid && m.at > Date.now() - 3 * 864e5 && !popSeen().includes(m.mid || m.id)).sort((a, b) => a.at - b.at);
+export async function ackPop(m) {
+  const id = m.mid || m.id;
+  ls("adgPopSeen", [...popSeen(), id].slice(-300));
+  await put("popreads/" + id + "/u", S.user.uid, {at: Date.now(), name: myFull()});
+}
+export const watchReads = (mid, cb) => watch("popreads/" + mid + "/u", cb);
+// מי אמור לקבל הודעה: כל הצוות, או חברי הקבוצות שנבחרו
+export const audienceOf = m => people().filter(p => !p.off && p.uid !== m.by && ((m.to || []).includes("all") || p.groups.some(g => (m.to || []).includes(g))));
+
+// ---- מערכת השינויים היומית: daily/<תאריך> = {data: JPEG כ-data URL, w, h, note, by, byName, at, to: ["all"] | [uid...] | []} ----
+const dailyW = {};
+export function watchDaily(date) {
+  if (dailyW[date]) return;
+  dailyW[date] = watchDoc("daily", date, d => { S.daily[date] = d; changed(); });
+}
+export async function saveDaily(date, doc, notifyTo) {
+  await put("daily", date, Object.assign({by: S.user.uid, byName: myFull(), at: Date.now(), to: notifyTo}, doc));
+  if (notifyTo.length) notify({kind: "daily", date, to: notifyTo, text: doc.note || ""});
+}
+export const delDaily = date => del("daily", date);
 // מבקש משרת הכניסה לשלוח התראת דחיפה לנמענים. לא מעכב ולא מכשיל את השליחה עצמה.
 function notify(msg) { if (!DEMO) idToken().then(t => api(Object.assign({a: "notify", t}, msg))).catch(() => {}); }
 // הערוצים שבהם יושבת הודעה: קהלי היעד + העותק של השולח. הודעת צוות ניהול יושבת רק בערוץ שלו.

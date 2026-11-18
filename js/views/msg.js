@@ -1,14 +1,15 @@
 // הודעות: לוח הודעות לפי קהל יעד + שיחות פרטיות בין אנשי צוות.
 import {S} from "../state.js";
 import {$, esc, ls, ago, hhmm, dayLabel} from "../util.js";
-import {isAdmin, groups, groupLabel, people, person, sendBoard, delBoard, unreadBoard, unreadChats, chatUnread, otherOf, cidOf, openChat, sendChat, markChatSeen, MGMT, isMgmt, unreadMgmt} from "../data.js";
+import {isAdmin, groups, groupLabel, people, person, sendBoard, delBoard, unreadBoard, unreadChats, chatUnread, otherOf, cidOf, openChat, sendChat, markChatSeen, MGMT, isMgmt, unreadMgmt, canPublish} from "../data.js";
 import {loading, empty, field, tags, avatar, chips, ui, tryDo} from "../ui.js";
 
 let tab = "board", q = "", flt = "";
 
-export const boardItem = (m, plain) => '<article class="msg' + (m.at > (ls((m.to || []).includes(MGMT) ? "adgSeenM" : "adgSeen") || 0) && m.by !== S.user.uid ? " new" : "") + '"><div class="mh"><b>' + esc(m.title) + "</b>" +
+export const boardItem = (m, plain) => '<article class="msg' + (m.at > (ls((m.to || []).includes(MGMT) ? "adgSeenM" : "adgSeen") || 0) && m.by !== S.user.uid ? " new" : "") + '"><div class="mh"><b>' + esc(m.title) + "</b>" + (m.pop ? '<span class="poptag"><i class="fa-solid fa-bell"></i> הודעה קופצת</span>' : "") +
   (!plain && (m.by === S.user.uid || isAdmin()) ? '<button type="button" class="del" data-del="' + esc(m.mid || m.id) + '" aria-label="מחיקה"><i class="fa-solid fa-trash-can"></i></button>' : "") + "</div>" +
-  '<div class="tags">' + tags((m.to || ["all"]).filter(groupLabel)) + "</div><p>" + esc(m.body) + "</p><small>" + esc(m.byName || "") + " · " + esc(ago(m.at)) + "</small></article>";
+  '<div class="tags">' + tags((m.to || ["all"]).filter(groupLabel)) + "</div><p>" + esc(m.body) + "</p><small>" + esc(m.byName || "") + " · " + esc(ago(m.at)) + "</small>" +
+  (m.pop && !plain && (m.by === S.user.uid || canPublish()) ? '<a class="link reads" href="#/reads/' + encodeURIComponent(m.mid || m.id) + '"><i class="fa-solid fa-check-double"></i> מי קרא</a>' : "") + "</article>";
 
 // kind: "board" = לוח ההודעות הכללי (בוחרים קהל יעד); "mgmt" = תיבת צוות הניהול (רק חברי הקבוצה רואים וכותבים)
 function boardHtml(kind) {
@@ -19,6 +20,7 @@ function boardHtml(kind) {
     (kind === "mgmt" ? '<input type="checkbox" name="to" value="' + MGMT + '" checked hidden>' : '<fieldset class="aud"><legend>מי יראה את ההודעה</legend><label class="pill"><input type="checkbox" name="to" value="all" checked><span>כל הצוות</span></label>' +
     groups().filter(g => g.id !== MGMT).map(g => '<label class="pill"><input type="checkbox" name="to" value="' + esc(g.id) + '"><span>' + esc(g.label) + "</span></label>").join("") + "</fieldset>") +
     field("כותרת", '<input name="title" required maxlength="80">') + field("תוכן ההודעה", '<textarea name="body" rows="4" required maxlength="2000"></textarea>') +
+    (canPublish() ? '<label class="check popchk"><input type="checkbox" name="pop"> <span><b>הודעה קופצת</b> - תופיע לכל נמען במסך עד שיאשר שקרא, עם התראה לטלפון. אפשר לראות מי קרא.</span></label>' : "") +
     '<button class="btn">שליחה</button></form></details>' +
     (list.length ? list.map(m => boardItem(m)).join("") : empty("אין הודעות", kind === "mgmt" ? "הודעות של צוות הניהול יופיעו כאן." : "הודעות לצוות יופיעו כאן."));
 }
@@ -57,7 +59,7 @@ export const msg = {
       const to = boxes.filter(c => c.checked).map(c => c.value);
       if (!to.length) { alert("צריך לבחור מי יראה את ההודעה."); return; }
       const d = new FormData(f), btn = f.querySelector(".btn"); btn.disabled = true;
-      if (await tryDo(() => sendBoard(String(d.get("title")).trim(), String(d.get("body")).trim(), to))) ui.render(); else btn.disabled = false;
+      if (await tryDo(() => sendBoard(String(d.get("title")).trim(), String(d.get("body")).trim(), to, d.get("pop") === "on"))) ui.render(); else btn.disabled = false;
     };
   }
 };

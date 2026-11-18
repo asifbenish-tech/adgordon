@@ -292,7 +292,9 @@ function secTokens_(pushDocs) {
 }
 
 // ---- התראה על הודעה חדשה. האפליקציה של השולח קוראת לזה מיד אחרי השליחה: {a:"notify", t:<אסימון>, kind, to, title, text} ----
-// kind: "board" (to = ["all"] או מזהי קבוצות), "mgmt" (תיבת צוות הניהול), "chat" (to = uid של הנמען).
+// kind: "board" (to = ["all"] או מזהי קבוצות), "mgmt" (תיבת צוות הניהול), "chat" (to = uid של הנמען),
+//       "daily" (מערכת השינויים: to = ["all"] או רשימת uid של מי שיש לו שינוי). pop: true = הודעה קופצת ("דחופה").
+// הודעה קופצת ומערכת השינויים: רק הנהלה (role=admin) או צוות ניהול.
 var NOTIFY_HOUR = 60;   // עד 60 הודעות עם התראה לשעה לשולח אחד
 function notify_(r) {
   var who = whoIs_(String(r.t || ""));
@@ -304,15 +306,24 @@ function notify_(r) {
   if (me.off) return {ok: false, error: "החשבון חסום."};
   var clip = function (x, m) { x = String(x || "").replace(/\s+/g, " ").trim(); return x.length > m ? x.slice(0, m - 1) + "…" : x; };
   var from = me.full || who.n, to = Array.isArray(r.to) ? r.to.map(String) : [String(r.to || "")], ids = {}, title, body, url;
+  var publisher = (me.role || who.r) === "admin" || mine.indexOf("mgmt") >= 0;
+  if ((r.pop || r.kind === "daily") && !publisher) return {ok: false, error: "רק הנהלה או צוות ניהול."};
+  var urgent = r.pop ? "הודעה דחופה: " : "";
   if (r.kind === "chat") { ids[to[0]] = 1; title = from; body = clip(r.text, 120); url = "#/chat/" + who.uid; }
   else if (r.kind === "mgmt") {
     if (mine.indexOf("mgmt") < 0) return {ok: false, error: "רק חברי צוות הניהול."};
     staff.forEach(function (x) { if ((x.groups || []).indexOf("mgmt") >= 0) ids[x.id] = 1; });
-    title = "צוות ניהול: " + clip(r.title, 60); body = from + " · " + clip(r.text, 100); url = "#/msg";
+    title = (urgent || "צוות ניהול: ") + clip(r.title, 60); body = from + " · " + clip(r.text, 100); url = "#/msg";
   } else if (r.kind === "board") {
     to = to.filter(function (g) { return g !== "mgmt"; });
     staff.forEach(function (x) { if (to.indexOf("all") >= 0 || (x.groups || []).some(function (g) { return to.indexOf(g) >= 0; })) ids[x.id] = 1; });
-    title = "הודעה חדשה: " + clip(r.title, 60); body = from + " · " + clip(r.text, 100); url = "#/msg";
+    title = (urgent || "הודעה חדשה: ") + clip(r.title, 60); body = from + " · " + clip(r.text, 100); url = "#/msg";
+  } else if (r.kind === "daily") {
+    var all = to.indexOf("all") >= 0, date = /^\d{4}-\d{2}-\d{2}$/.test(String(r.date)) ? String(r.date) : "";
+    if (all) staff.forEach(function (x) { ids[x.id] = 1; }); else to.forEach(function (u) { ids[u] = 1; });
+    title = all ? "מערכת השינויים עלתה" : "יש שינוי במערכת שלך";
+    body = (date ? "ל-" + date.split("-").reverse().slice(0, 2).join(".") + " · " : "") + (clip(r.text, 90) || "לחיצה לפתיחת התמונה");
+    url = "#/daily" + (date ? "/" + date : "");
   } else return {ok: false, error: "סוג לא מוכר."};
   delete ids[who.uid];
   staff.forEach(function (x) { if (x.off || x.removed) delete ids[x.id]; });

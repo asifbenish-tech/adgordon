@@ -7,6 +7,7 @@ import {$, esc, iso, today, parse, DAYN} from "../util.js";
 import {isAdmin, myFull, myDuty, dutyNow, checkIn, checkedIn, allDays, unreadChats, unreadBoard, unreadMgmt} from "../data.js";
 import {loading, empty, secHead, ui, tryDo} from "../ui.js";
 import {slots} from "./tt.js";
+import {dailyCard} from "./daily.js";
 
 const SIDES = {"יסודי": "#2c8a7e", "חטיבה": "#2f6fd1", 'תל"ן': "#c98a12", "מגמות": "#cf4b3a", "סדירות": "#6c5fbf"};
 const ICON = {vac: "fa-umbrella-beach", trip: "fa-person-hiking", event: "fa-star"};
@@ -70,6 +71,7 @@ export default {
     const un = unreadBoard() + unreadChats() + unreadMgmt(), last = S.board && S.board[0];
     if (un) h += '<a class="alert" href="#/msg"><i class="fa-solid fa-envelope"></i><span><b>' + (un === 1 ? "הודעה חדשה" : un + " הודעות חדשות") + "</b>" + (last ? " · " + esc(last.title) : "") + '</span><i class="fa-solid fa-chevron-left go"></i></a>';
     const isToday = sel === today(), d = parse(sel), c = cal && cal.find(x => x.date === sel);
+    h += dailyCard(sel);
     h += allDayHtml(c);
     h += secHead(isToday ? "היום שלי" : "יום " + DAYN[d.getDay()] + " " + d.getDate() + "." + (d.getMonth() + 1), "#/tt", "המערכת השבועית");
     if (!S.T || !S.duty || !S.staff) h += loading;

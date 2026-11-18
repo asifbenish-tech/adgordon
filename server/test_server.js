@@ -301,6 +301,19 @@ assert.deepStrictEqual(W.pushes[0].data, {title: "רותי כהן", body: "הי�
 W.fsdb["staff/" + uid("אנה")].off = {booleanValue: true};
 [nr, nt] = note({t: rutiTok, kind: "chat", to: uid("אנה"), text: "היי"}); assert.strictEqual(nt, "", "blocked people get nothing");
 [nr, nt] = note({t: forged, kind: "board", to: ["all"], title: "x", text: "y"}); assert.match(nr.error, /להיכנס מחדש/); assert.strictEqual(nt, "");
+// ---- הודעה קופצת ומערכת השינויים: רק הנהלה / צוות ניהול ----
+W.fsdb["staff/" + uid("אנה")].off = {booleanValue: false};
+[nr, nt] = note({t: rutiTok, kind: "board", to: ["all"], title: "x", text: "y", pop: true}); assert.match(nr.error, /הנהלה או צוות ניהול/); assert.strictEqual(nt, "", "a teacher cannot send a pop-up");
+[nr, nt] = note({t: adminTok, kind: "board", to: ["all"], title: "תרגיל", text: "בשעה 10", pop: true}); assert.strictEqual(nr.ok, true);
+assert.strictEqual(W.pushes[0].data.title, "הודעה דחופה: תרגיל");
+[nr, nt] = note({t: rutiTok, kind: "daily", date: "2026-11-18", to: ["all"]}); assert.match(nr.error, /הנהלה או צוות ניהול/);
+[nr, nt] = note({t: adminTok, kind: "daily", date: "2026-11-18", to: ["all"], text: "שינויים בז"}); assert.strictEqual(nt, "dead,tokA,tokAnna,tokHasan", "everyone registered except the sender");
+assert.deepStrictEqual(W.pushes[0].data, {title: "מערכת השינויים עלתה", body: "ל-18.11 · שינויים בז", url: "#/daily/2026-11-18"});
+[nr, nt] = note({t: adminTok, kind: "daily", date: "2026-11-18", to: [uid("חסן")]}); assert.strictEqual(nt, "tokHasan", "only the people picked");
+assert.strictEqual(W.pushes[0].data.title, "יש שינוי במערכת שלך");
+W.fsdb["staff/" + uid("רותי")].groups = L(["hA", "mgmt"]);
+[nr, nt] = note({t: rutiTok, kind: "daily", date: "bad", to: [uid("אנה")]}); assert.strictEqual(nt, "tokAnna", "a mgmt member may publish too");
+assert.strictEqual(W.pushes[0].data.url, "#/daily");
 W.clearCache(); for (let i = 0; i < 60; i++) W.post({a: "notify", t: rutiTok, kind: "chat", to: uid("חסן"), text: "x"});
 assert.match(W.post({a: "notify", t: rutiTok, kind: "chat", to: uid("חסן"), text: "x"}).error, /יותר מדי/, "rate limit per sender");
 

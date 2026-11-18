@@ -80,6 +80,24 @@ await t("cannot read others' check-ins", no(getDocs(query(collection(T2, "checki
 await t("admin reads today's check-ins", ok(getDocs(query(collection(A, "checkins"), where("date", "==", "2026-11-12")))));
 await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(), "staff/t_sec"), {name: "t_sec", groups: ["sec"]}));
 await t("security officer reads today's check-ins", ok(getDocs(query(collection(db("t_sec", "teacher"), "checkins"), where("date", "==", "2026-11-12")))));
+// הודעה קופצת ומערכת השינויים
+await t("teacher cannot send a pop-up", no(setDoc(doc(T2, "channels/all/msgs/p1"), Object.assign(m("t_two"), {pop: true}))));
+await t("admin sends a pop-up", ok(setDoc(doc(A, "channels/all/msgs/p2"), Object.assign(m("t_admin"), {pop: true}))));
+await t("teacher still sends normal messages", ok(setDoc(doc(T2, "channels/all/msgs/p3"), m("t_two"))));
+await t("ack own read", ok(setDoc(doc(T2, "popreads/p2/u/t_two"), {at: 1, name: "x"})));
+await t("cannot ack for someone else", no(setDoc(doc(T2, "popreads/p2/u/t_one"), {at: 1, name: "x"})));
+await t("teacher cannot see who read", no(getDocs(collection(T2, "popreads/p2/u"))));
+await t("admin sees who read", ok(getDocs(collection(A, "popreads/p2/u"))));
+const dimg = {data: "data:image/jpeg;base64," + "A".repeat(5000), w: 100, h: 100, note: "", at: 1, to: ["all"]};
+await t("teacher cannot upload the daily changes", no(setDoc(doc(T2, "daily/2026-11-18"), Object.assign({by: "t_two"}, dimg))));
+await t("admin uploads the daily changes", ok(setDoc(doc(A, "daily/2026-11-18"), Object.assign({by: "t_admin"}, dimg))));
+await t("everyone reads the daily changes", ok(getDoc(doc(T2, "daily/2026-11-18"))));
+await t("daily must be a jpeg", no(setDoc(doc(A, "daily/2026-11-19"), Object.assign({by: "t_admin"}, dimg, {data: "data:text/html;base64,AAAA"}))));
+await t("daily id must be a date", no(setDoc(doc(A, "daily/hello"), Object.assign({by: "t_admin"}, dimg))));
+await t("teacher cannot delete the daily changes", no(deleteDoc(doc(T2, "daily/2026-11-18"))));
+await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(), "staff/t_mg"), {name: "t_mg", groups: ["mgmt"]}));
+await t("mgmt member uploads the daily changes", ok(setDoc(doc(db("t_mg", "teacher"), "daily/2026-11-20"), Object.assign({by: "t_mg"}, dimg))));
+await t("mgmt member sends a pop-up", ok(setDoc(doc(db("t_mg", "teacher"), "channels/all/msgs/p4"), Object.assign(m("t_mg"), {pop: true}))));
 // תמונות פרופיל
 const jpg = "data:image/jpeg;base64," + "A".repeat(2000);
 await t("own photo", ok(setDoc(doc(T1, "photos/t_one"), {data: jpg, at: 1})));

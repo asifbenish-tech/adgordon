@@ -4,7 +4,7 @@ import {DEMO} from "./config.js";
 import {$, esc} from "./util.js";
 import {ui, avatar} from "./ui.js";
 import {initAuth, loginHtml, bindLogin} from "./auth.js";
-import {unreadBoard, unreadChats, unreadMgmt} from "./data.js";
+import {unreadBoard, unreadChats, unreadMgmt, popPending, ackPop} from "./data.js";
 import {syncPush} from "./push.js";
 import home, {dateLine} from "./views/home.js";
 import tt from "./views/tt.js";
@@ -16,10 +16,12 @@ import profile from "./views/profile.js";
 import menu from "./views/menu.js";
 import {portal, bank} from "./views/portal.js";
 import tools from "./views/tools.js";
+import daily from "./views/daily.js";
+import reads from "./views/reads.js";
 import seat from "./views/seat.js";
 import dining from "./views/dining.js";
 
-const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: menu, edit: profile, portal, bank, tools, seat, dining};
+const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: menu, edit: profile, portal, bank, tools, seat, dining, daily, reads};
 // המערכת והשמירות נמצאות באזור האישי (לחיצה על התמונה למעלה)
 const TABS = [["home", "היום", "fa-sun"], ["msg", "הודעות", "fa-comments"], ["new", "צוות", "fa-address-book"], ["portal", "מידע", "fa-book-open"], ["tools", "כלים", "fa-grip"]];
 let last = "";
@@ -35,6 +37,7 @@ function render(force) {
   const tab = v.tab != null ? v.tab : r.name;
   for (const a of $("tabs").children) a.setAttribute("aria-current", a.dataset.t === tab ? "page" : "false");
   badge();
+  popCheck();
   $("title").textContent = v.title(r.arg);
   document.body.classList.toggle("hero", r.name === "home");
   document.body.classList.toggle("wide", !!v.wide);   // מסך שצריך רוחב (מפת הכיתה)
@@ -60,6 +63,21 @@ const SIZES = [1, 1.12, 1.25];
 function setFs(v) { document.documentElement.style.setProperty("--fs", v); $("aa").textContent = v > 1 ? "א" + "+".repeat(SIZES.indexOf(v)) : "א+"; $("aa").setAttribute("aria-label", "גודל טקסט: " + Math.round(v * 100) + "%"); }
 setFs(SIZES.includes(+localStorage.getItem("adgFs")) ? +localStorage.getItem("adgFs") : 1);
 $("aa").onclick = () => { const cur = +getComputedStyle(document.documentElement).getPropertyValue("--fs") || 1, v = SIZES[(SIZES.indexOf(cur) + 1) % SIZES.length]; try { localStorage.setItem("adgFs", v); } catch (e) {} setFs(v); };
+
+// הודעה קופצת: חלון מעל כל מסך, עד שלוחצים "קראתי". אחת בכל פעם, הישנה קודם.
+let popShown = "";
+function popCheck() {
+  const m = S.user ? popPending()[0] : null, box = $("pop");
+  if (!m) { box.hidden = true; popShown = ""; return; }
+  const id = m.mid || m.id;
+  if (popShown === id && !box.hidden) return;
+  popShown = id;
+  box.innerHTML = '<div class="popcard" role="alertdialog" aria-modal="true" aria-labelledby="popt"><div class="pophd"><i class="fa-solid fa-bell"></i> הודעה מצוות הניהול</div>' +
+    '<h2 id="popt">' + esc(m.title) + "</h2><p>" + esc(m.body) + "</p><small>" + esc(m.byName || "") + '</small><button type="button" class="btn" id="popok">קראתי</button></div>';
+  box.hidden = false;
+  $("popok").focus();
+  $("popok").onclick = async () => { $("popok").disabled = true; try { await ackPop(m); } catch (e) {} popShown = ""; popCheck(); render(false); };
+}
 
 function badge() {
   const em = document.querySelector('#tabs a[data-t="msg"] em'), n = unreadBoard() + unreadChats() + unreadMgmt();
