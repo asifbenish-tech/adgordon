@@ -42,6 +42,10 @@ export function seed() {
         {h: 2, cls: "ו3", items: [{tn: o(2), u: u(2), subj: "עברית", why: "event", ev: "השתלמות", sub: null}], note: "הכיתה בספרייה"}],
         absent: [{tn: o(3), u: u(3), hours: [1, 2]}], mine: {}})}];
   }
+  // תמונה לדוגמה של מערכת השינויים (טבלה מצוירת), כמו זו שנשלחת מניהול גורדון
+  const cells = [...Array(8)].map((_, r) => [...Array(10)].map((_, c) => '<rect x="' + (c * 80) + '" y="' + (40 + r * 34) + '" width="80" height="34" fill="' + ((r * 3 + c) % 7 === 0 ? "#fff3c4" : (r + c) % 9 === 0 ? "#fde2e2" : "#fff") + '" stroke="#ccd"/>').join("")).join("");
+  db.daily = [{id: dd(0), data: "data:image/svg+xml;charset=utf-8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="320"><rect width="800" height="40" fill="#7a1f1f"/><text x="400" y="26" fill="#fff" font-size="18" text-anchor="middle" font-family="sans-serif">מערכת שינויים</text>' + cells + "</svg>"),
+    w: 800, h: 320, note: "", by: "school-gordon", byName: "ניהול גורדון", at: now - H, to: []}];
   db["chats/" + cid + "/msgs"] = [
     {id: "c1", by: me.uid, text: "היי, אפשר להחליף איתך שמירה ביום שלישי?", at: now - 3 * H},
     {id: "c2", by: u(0), text: "כן, אין בעיה.", at: now - 2.5 * H},

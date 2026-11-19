@@ -28,14 +28,18 @@ const touchesMe = (r, me) => (r.items || []).some(it => it.u === me || (it.sub &
   (r.overrides || []).some(o => o.u === me || (o.sub && o.sub.u === me)) || (!!r.cancel && (r.teachers || []).some(x => x.u === me));
 
 // הכרטיס במסך הבית: אחד, ללוח השינויים של היום שנבחר
+// הכרטיס במסך הבית: תמונת מערכת השינויים (אם נשלחה) גדולה, השינויים של המורה המחובר/ת, וכניסה ללוח השינויים המלא
 export function changesCard(date) {
   watchChanges(date); watchDaily(date);
   const c = S.changes[date], img = S.daily[date], n = count(c), mine = myChanges(date);
   if (!n && !img) return "";
-  const sub = n ? n + (n === 1 ? " שינוי" : " שינויים") + " בבית החינוך" + (c.at ? " · עודכן ב-" + hhmm(c.at) : "") : "יש תמונה של מערכת השינויים";
-  return '<div class="list"><a class="item chgcard' + (mine.length ? " mine" : "") + '" href="#/changes/' + date + '"><div class="ico ' + (mine.length ? "gold" : "blue") + '"><i class="fa-solid fa-shuffle"></i></div><div><b>לוח שינויים' + (date === today() ? " להיום" : "") + "</b>" +
-    (mine.length ? '<span class="minetag"><i class="fa-solid fa-circle-exclamation"></i> ' + (mine.length === 1 ? "יש לך שינוי" : "יש לך " + mine.length + " שינויים") + "</span>" : "") +
-    "<span>" + esc(sub) + '</span></div><i class="fa-solid fa-chevron-left go"></i></a></div>';
+  const at = c && c.at ? c.at : img && img.at;
+  return '<a class="chghome' + (mine.length ? " mine" : "") + '" href="#/changes/' + date + '">' +
+    '<div class="chhead"><b><i class="fa-solid fa-shuffle"></i> מערכת השינויים' + (date === today() ? " להיום" : "") + "</b>" + (at ? "<span>עודכן ב-" + hhmm(at) + "</span>" : "") + "</div>" +
+    (mine.length ? '<div class="chmine"><b><i class="fa-solid fa-circle-exclamation"></i> ' + (mine.length === 1 ? "יש לך שינוי" : "יש לך " + mine.length + " שינויים") + "</b><ul>" +
+      mine.map(x => "<li><i class=\"fa-solid " + (x.k === "in" ? "fa-person-chalkboard" : x.k === "cancel" ? "fa-ban" : "fa-shuffle") + "\"></i> שעה " + x.h + " · " + esc(x.cls) + " · " + esc(chgText(x)) + "</li>").join("") + "</ul></div>" : "") +
+    (img ? '<img src="' + esc(img.data) + '" alt="מערכת השינויים">' : "") +
+    '<span class="chgo">' + (n ? "לכל השינויים בבית החינוך (" + n + ")" : "לפתיחת מערכת השינויים") + ' <i class="fa-solid fa-chevron-left"></i></span></a>';
 }
 
 function itemHtml(it, me) {
