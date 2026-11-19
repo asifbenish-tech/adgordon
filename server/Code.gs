@@ -523,7 +523,8 @@ function fsGet_(path) {
 }
 
 // ---- התראה על הודעה חדשה. האפליקציה של השולח קוראת לזה מיד אחרי השליחה: {a:"notify", t:<אסימון>, kind, to, title, text} ----
-// kind: "board" (to = ["all"] או מזהי קבוצות), "mgmt" (תיבת צוות הניהול), "chat" (to = uid של הנמען),
+// kind: "board" (to = ["all"] או מזהי קבוצות; notice: true = הודעה חשובה בעמוד הבית), "mgmt" (תיבת צוות הניהול), "chat" (to = uid של הנמען),
+//       "group" (to = מזהה קבוצת שיחה chats/g_* או sys_*: רק משתתף שולח, ההתראה לשאר המשתתפים),
 //       "daily" (מערכת השינויים: to = ["all"] או רשימת uid של מי שיש לו שינוי). pop: true = הודעה קופצת ("דחופה").
 // הודעה קופצת ומערכת השינויים: רק הנהלה (role=admin) או צוות ניהול.
 var NOTIFY_HOUR = 60;   // עד 60 הודעות עם התראה לשעה לשולח אחד
@@ -539,8 +540,16 @@ function notify_(r) {
   var from = me.full || who.n, to = Array.isArray(r.to) ? r.to.map(String) : [String(r.to || "")], ids = {}, title, body, url;
   var publisher = (me.role || who.r) === "admin" || mine.indexOf("mgmt") >= 0;
   if ((r.pop || r.kind === "daily") && !publisher) return {ok: false, error: "רק הנהלה או צוות ניהול."};
-  var urgent = r.pop ? "הודעה דחופה: " : "";
+  if (r.notice && !publisher) return {ok: false, error: "רק הנהלה או צוות ניהול."};
+  var urgent = r.pop ? "הודעה דחופה: " : r.notice ? "הודעה חשובה: " : "";
   if (r.kind === "chat") { ids[to[0]] = 1; title = from; body = clip(r.text, 120); url = "#/chat/" + who.uid; }
+  else if (r.kind === "group") {
+    // קבוצת שיחה (chats/g_* או sys_*): רק משתתף יכול לשלוח, וההתראה לשאר המשתתפים
+    var gid = /^(g|sys)_[A-Za-z0-9_]{1,40}$/.test(to[0]) ? to[0] : "", grp = gid ? fsGet_("chats/" + gid) : null;
+    if (!grp || (grp.members || []).indexOf(who.uid) < 0) return {ok: false, error: "לא חבר/ה בקבוצה."};
+    grp.members.forEach(function (u) { ids[u] = 1; });
+    title = clip(grp.name || "קבוצה", 60); body = from.split(" ")[0] + ": " + clip(r.text, 110); url = "#/group/" + gid;
+  }
   else if (r.kind === "mgmt") {
     if (mine.indexOf("mgmt") < 0) return {ok: false, error: "רק חברי צוות הניהול."};
     staff.forEach(function (x) { if ((x.groups || []).indexOf("mgmt") >= 0) ids[x.id] = 1; });

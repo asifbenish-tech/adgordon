@@ -8,7 +8,7 @@ export function seed() {
   const dd = n => { const d = new Date(); d.setDate(d.getDate() + n); if (d.getDay() === 6) d.setDate(d.getDate() + 1); return iso(d); };
   const H = 36e5, now = Date.now();
   const msg = (mid, title, body, by, at, to) => ({id: mid, mid, title, body, by: uidOf(by), byName: by, at, to});
-  const m1 = msg("m1", "אסיפת צוות ביום ראשון", "מתכנסים בחדר המורים בשעה 14:00.\nנא להגיע בזמן.", o(0), now - H, ["all"]);
+  const m1 = Object.assign(msg("m1", "אסיפת צוות ביום ראשון", "מתכנסים בחדר המורים בשעה 14:00. נא להגיע בזמן.", o(0), now - H, ["all"]), {notice: true});
   const m2 = msg("m2", "ישיבת מחנכים", "הודעה לדוגמה שנשלחה רק לקבוצת המחנכים.", o(1), now - 20 * H, ["home"]);
   const m3 = msg("m3", "טיול בית א", "הודעה לדוגמה שנשלחה רק לצוות בית א.", o(2), now - 50 * H, ["hA"]);
   const cid = [me.uid, u(0)].sort().join("__");
@@ -23,7 +23,11 @@ export function seed() {
       {id: "e2", date: dd(9), time: "", title: "יום טיול שכבתי", place: "", note: "שכבת ו"},
       {id: "e3", date: dd(34), time: "18:00", title: "טקס חנוכה", place: "אולם", note: ""}],
     "channels/all/msgs": [m1], "channels/mgmt/msgs": [msg("m4", "תקציב טיולים", "הודעה לדוגמה בתיבת צוות הניהול. רק חברי הקבוצה רואים אותה.", o(0), now - 5 * H, ["mgmt"])], "channels/home/msgs": [m2], "channels/hA/msgs": [m3],
-    chats: [{id: cid, members: [me.uid, u(0)].sort(), names: {[me.uid]: me.name, [u(0)]: o(0)}, last: {text: "תודה, נדבר מחר", at: now - 2 * H, by: u(0)}}]
+    chats: [{id: cid, members: [me.uid, u(0)].sort(), names: {[me.uid]: me.name, [u(0)]: o(0)}, last: {text: "תודה, נדבר מחר", at: now - 2 * H, by: u(0)}},
+      // קבוצות: לוח בית חינוך, קבוצה קבועה (בית א) וקבוצה שמישהו פתח
+      {id: "sys_all", type: "group", sys: true, icon: "school", name: "לוח בית חינוך", members: [me.uid, u(0), u(1), u(2), u(3), u(4)], last: {text: "בוקר טוב לכולם!", at: now - 0.5 * H, by: u(1), byName: o(1)}},
+      {id: "sys_hA", type: "group", sys: true, icon: "group", name: "בית א", members: [me.uid, u(1), u(2)], last: {text: "מי לוקח את הטיול?", at: now - 3 * H, by: u(2), byName: o(2)}},
+      {id: "g_demo1", type: "group", name: "צוות טיול שנתי", members: [me.uid, u(1), u(3)], admins: [me.uid], last: {text: "סגרתי את האוטובוסים", at: now - 26 * H, by: me.uid}}]
   };
   // השינויים במערכת להיום: השיעור הראשון שלי מוחלף, ובשעה הפנויה הראשונה אני ממלא/ת מקום
   const day = new Date().getDay(), mine = ((S.T && S.T.teachers[me.name]) || []).filter(e => e[1] === day).sort((a, b) => a[2] - b[2]);
@@ -46,6 +50,9 @@ export function seed() {
   const cells = [...Array(8)].map((_, r) => [...Array(10)].map((_, c) => '<rect x="' + (c * 80) + '" y="' + (40 + r * 34) + '" width="80" height="34" fill="' + ((r * 3 + c) % 7 === 0 ? "#fff3c4" : (r + c) % 9 === 0 ? "#fde2e2" : "#fff") + '" stroke="#ccd"/>').join("")).join("");
   db.daily = [{id: dd(0), data: "data:image/svg+xml;charset=utf-8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="320"><rect width="800" height="40" fill="#7a1f1f"/><text x="400" y="26" fill="#fff" font-size="18" text-anchor="middle" font-family="sans-serif">מערכת שינויים</text>' + cells + "</svg>"),
     w: 800, h: 320, note: "", by: "school-gordon", byName: "ניהול גורדון", at: now - H, to: []}];
+  db["chats/sys_all/msgs"] = [{id: "a1", by: u(0), byName: o(0), text: "תזכורת: מחר יום ספורט, להגיע בבגדים מתאימים.", at: now - 5 * H}, {id: "a2", by: u(1), byName: o(1), text: "בוקר טוב לכולם!", at: now - 0.5 * H}];
+  db["chats/sys_hA/msgs"] = [{id: "h1", by: u(2), byName: o(2), text: "מי לוקח את הטיול?", at: now - 3 * H}];
+  db["chats/g_demo1/msgs"] = [{id: "t1", by: me.uid, byName: me.name, text: "סגרתי את האוטובוסים", at: now - 26 * H}];
   db["chats/" + cid + "/msgs"] = [
     {id: "c1", by: me.uid, text: "היי, אפשר להחליף איתך שמירה ביום שלישי?", at: now - 3 * H},
     {id: "c2", by: u(0), text: "כן, אין בעיה.", at: now - 2.5 * H},

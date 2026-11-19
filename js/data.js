@@ -115,8 +115,16 @@ export function loadTT() {
     const homes = {};   // מחנכ/ת -> {cls, house}: בסיס להצעת קבוצות אוטומטית
     for (const lvl of [j.elementary || {}, j.junior || {}]) for (const [cls, v] of Object.entries(lvl)) if (v.home) homes[v.home] = {cls};
     for (const x of j.index || []) if (x.type === "house") for (const [n, h] of Object.entries(homes)) if (x.classes.includes(h.cls)) h.house = x.id.split(":")[1];
-    S.T = {g: j.generated, days: j.days, teachers: j.teachers, full: j.full_names, homes};
-    ls("adgTT", S.T); changed();
+    // שכבות: מי מלמד בכל שכבה (לפי הכיתות שב-app_map, כך ש"אסיפת צוות" וכו' לא נספרים)
+    const clsGrade = {}, grades = {};
+    for (const [cls, v] of Object.entries((j.app_map && j.app_map.classes) || {})) if (v.grade) clsGrade[cls] = v.grade;
+    for (const [n, list] of Object.entries(j.teachers || {})) for (const e of list) {
+      const cls = String(e[3] || "").split(" · ")[0], g = clsGrade[cls];
+      if (g) (grades[g] = grades[g] || new Set()).add(n);
+    }
+    for (const g in grades) grades[g] = [...grades[g]];
+    S.T = {g: j.generated, days: j.days, teachers: j.teachers, full: j.full_names, homes, grades};
+    ls("adgTT", S.T); syncSysGroups(); changed();
   }).catch(() => {});
 }
 
@@ -129,6 +137,7 @@ export function startData() {
   watch("photos", list => { S.photos = {}; for (const x of list || []) S.photos[x.id] = x.data; changed(); });
   watch("meta", list => { S.groupsDoc = (list || []).find(x => x.id === "groups") || {}; S.toolsDoc = (list || []).find(x => x.id === "tools") || {}; after("groups"); });
   watch("chats", list => { S.chats = (list || []).sort((a, b) => ((b.last || {}).at || 0) - ((a.last || {}).at || 0)); syncChat(); changed(); }, {has: ["members", S.user.uid]});
+  S.notices = null;
   syncChannels();
 }
 
@@ -139,6 +148,7 @@ function after(key) {
     syncChannels();
     // פרטי הכניסה (ת"ז מגובבת, מייל) נקראים רק אצל הנהלה - הכללים חוסמים את כל השאר
     syncCheckins();
+    syncSysGroups();
     if (isAdmin() && !authWatch) authWatch = watch("staffAuth", list => { if (!list) return; S.auth = {}; for (const x of list) S.auth[x.id] = x; changed(); });
   }
   changed();
@@ -146,22 +156,23 @@ function after(key) {
 
 // ---- לוח ההודעות: ערוץ לכל קהל יעד. channels/<all | מזהה קבוצה | s_<uid> (הנשלחות שלי)>/msgs/<mid> ----
 function syncChannels() {
-  // ההנהלה רואה את כל ערוצי הקבוצות, חוץ מתיבת צוות הניהול - היא פתוחה רק למי שחבר בקבוצה
-  const mine = S.staff ? myGroups() : [];
-  const want = new Set(["all", "s_" + S.user.uid, ...mine, ...(isAdmin() ? groups().map(g => g.id).filter(id => id !== MGMT) : [])]);
-  for (const [ch, un] of chans) if (!want.has(ch)) { un(); chans.delete(ch); delete byChan[ch]; }
-  for (const ch of want) if (!chans.has(ch)) chans.set(ch, watch("channels/" + ch + "/msgs", list => { byChan[ch] = list || []; merge(); }, {recent: 100}));
-  merge();
+  // "הודעות חשובות" (ומהן הקופצות) יושבות בערוץ הכללי. הלוח לפי קבוצות הוחלף בקבוצות שיחה (chats/sys_*).
+  if (!chans.has("all")) chans.set("all", watch("channels/all/msgs", list => { byChan.all = list || []; merge(); }, {recent: 100}));
 }
 function merge() {
-  if (!byChan.all) return;   // עד שהערוץ הכללי נטען - "טוען"
-  const m = new Map();
-  for (const list of Object.values(byChan)) for (const x of list) m.set(x.mid || x.id, x);
-  const all = [...m.values()].sort((a, b) => b.at - a.at), isM = x => (x.to || []).includes(MGMT);
-  S.board = all.filter(x => !isM(x)); S.mgmt = all.filter(isM);
+  if (!byChan.all) return;
+  S.board = [...byChan.all].sort((a, b) => b.at - a.at); S.mgmt = [];
+  S.notices = S.board.filter(m => m.notice || m.pop);
   changed();
 }
 // pop = הודעה קופצת (רק הנהלה/צוות ניהול): קופצת לכל נמען במסך עד שהוא מאשר שקרא, ונשלחת כהתראה "דחופה"
+// הודעה חשובה בעמוד הבית של כולם (הנהלה/צוות ניהול). pop = גם קופצת עם אישור קריאה.
+export async function sendNotice(title, body, pop) {
+  const mid = rid(), doc = Object.assign({mid, title, body, to: ["all"], notice: true, by: S.user.uid, byName: myFull(), at: Date.now()}, pop ? {pop: true} : {});
+  await put("channels/all/msgs", mid, doc);
+  notify(Object.assign({kind: "board", to: ["all"], title, text: body, notice: true}, pop ? {pop: true} : {}));
+}
+export const delNotice = m => del("channels/all/msgs", m.mid || m.id);
 export async function sendBoard(title, body, to, pop) {
   const mid = rid(), doc = Object.assign({mid, title, body, to, by: S.user.uid, byName: myFull(), at: Date.now()}, pop ? {pop: true} : {});
   await Promise.all(chansOf(doc).map(ch => put("channels/" + ch + "/msgs", mid, doc)));
@@ -172,7 +183,7 @@ export const canPublish = () => isAdmin() || isMgmt();
 
 // ---- הודעות קופצות: מה עוד לא אושר אצלי (3 ימים אחורה, כדי שמי שנכנס לראשונה לא יקבל ערימה) ----
 const popSeen = () => ls("adgPopSeen") || [];
-export const popPending = () => [...(S.board || []), ...(S.mgmt || [])]
+export const popPending = () => [...(S.board || [])]
   .filter(m => m.pop && m.by !== S.user.uid && m.at > Date.now() - 3 * 864e5 && !popSeen().includes(m.mid || m.id)).sort((a, b) => a.at - b.at);
 export async function ackPop(m) {
   const id = m.mid || m.id;
@@ -216,35 +227,86 @@ function notify(msg) { if (!DEMO) idToken().then(t => api(Object.assign({a: "not
 const chansOf = m => (m.to || []).includes(MGMT) ? [MGMT] : [...(m.to || []), "s_" + m.by];
 export const delBoard = m => Promise.all(chansOf(m).map(ch => del("channels/" + ch + "/msgs", m.mid || m.id)));
 export const isMgmt = () => !!S.staff && myGroups().includes(MGMT);
-export const unreadMgmt = () => { const seen = ls("adgSeenM") || 0; return isMgmt() ? (S.mgmt || []).filter(m => m.at > seen && m.by !== S.user.uid).length : 0; };
-export const unreadBoard = () => { const seen = ls("adgSeen") || 0; return (S.board || []).filter(m => m.at > seen && m.by !== S.user.uid).length; };
+export const unreadMgmt = () => 0;   // תיבת צוות הניהול הוחלפה בקבוצת השיחה sys_mgmt
+export const unreadBoard = () => 0;   // הלוח הוחלף בקבוצת "לוח בית חינוך" (sys_all)
 
-// ---- שיחות פרטיות: chats/<uidA__uidB> + chats/<cid>/msgs ----
+// ---- שיחות: פרטיות chats/<uidA__uidB>, קבוצות chats/g_<id> (כל אחד פותח), וקבוצות קבועות chats/sys_<key> + msgs מתחת לכל אחת ----
+// קבוצה = {type: "group", name, members: [uid], admins?: [uid], sys?: true, last}. קבוצה קבועה מתעדכנת לבד (syncSysGroups) ואי אפשר לערוך אותה.
+export const ALL_CHAT = "sys_all";   // "לוח בית חינוך": כל הצוות, כמו שיחה
+export const isGroup = c => !!c && (c.type === "group" || /^(g|sys)_/.test(c.id || ""));
 export const cidOf = other => [S.user.uid, other].sort().join("__");
 export const otherOf = chat => chat.members.find(u => u !== S.user.uid) || S.user.uid;
+export const chatById = id => (S.chats || []).find(c => c.id === id) || null;
 export const chatUnread = c => !!c.last && c.last.by !== S.user.uid && c.last.at > ((ls("adgChatSeen") || {})[c.id] || 0);
-export const unreadChats = () => (S.chats || []).filter(chatUnread).length;
+export const unreadChats = () => (S.chats || []).filter(c => (c.members || []).length && chatUnread(c)).length;
 export function markChatSeen(cid) { const m = ls("adgChatSeen") || {}; m[cid] = Date.now(); ls("adgChatSeen", m); }
-export function openChat(other) {
-  if (S.chatWith === other) return;
-  S.chatWith = other; S.chatMsgs = null;
+// פתיחת שיחה: לפי uid של איש צוות (פרטית) או לפי מזהה קבוצה
+export function openChat(other) { openConv(cidOf(other)); }
+export function openConv(cid) {
+  if (S.convId === cid) return;
+  S.convId = cid; S.chatMsgs = null;
   if (chatUnsub) { chatUnsub(); chatUnsub = null; } chatCid = null;
   syncChat();
 }
 // מאזינים להודעות רק אחרי שהשיחה קיימת (לפני ההודעה הראשונה אין מה לקרוא, והכללים חוסמים)
 function syncChat() {
-  if (!S.chatWith || !S.chats) return;
-  const cid = cidOf(S.chatWith);
+  if (!S.convId || !S.chats) return;
+  const cid = S.convId;
   if (!S.chats.some(c => c.id === cid)) { S.chatMsgs = []; return; }
   if (chatCid === cid) return;
   chatCid = cid;
-  chatUnsub = watch("chats/" + cid + "/msgs", list => { S.chatMsgs = (list || []).sort((a, b) => a.at - b.at); changed(); }, {recent: 200});
+  chatUnsub = watch("chats/" + cid + "/msgs", list => { S.chatMsgs = (list || []).sort((a, b) => a.at - b.at); changed(); }, {recent: 300});
 }
 export async function sendChat(other, text) {
   const me = S.user.uid, cid = cidOf(other), at = Date.now();
   await put("chats", cid, {members: [me, other].sort(), names: {[me]: S.user.name, [other]: person(other).name}, last: {text: text.slice(0, 80), at, by: me}}, true);
   await put("chats/" + cid + "/msgs", null, {by: me, text, at});
   notify({kind: "chat", to: other, text});
+}
+export async function sendGroup(gid, text) {
+  const me = S.user.uid, at = Date.now();
+  await put("chats/" + gid + "/msgs", null, {by: me, byName: myFull(), text, at});
+  await put("chats", gid, {last: {text: text.slice(0, 80), at, by: me, byName: myFull().split(" ")[0]}}, true);
+  notify({kind: "group", to: gid, text});
+}
+// קבוצה חדשה (כל איש צוות): מי שפותח = מנהל הקבוצה
+export async function newGroup(name, members) {
+  const gid = "g_" + rid(), me = S.user.uid;
+  await put("chats", gid, {type: "group", name, members: [...new Set([me, ...members])], admins: [me], by: me, at: Date.now()});
+  return gid;
+}
+export const isGroupAdmin = c => !!c && !c.sys && (c.admins || []).includes(S.user.uid);
+export const updateGroup = (gid, patch) => put("chats", gid, patch, true);
+export async function leaveGroup(c) {
+  const me = S.user.uid, members = (c.members || []).filter(u => u !== me), admins = (c.admins || []).filter(u => u !== me);
+  await put("chats", c.id, {members, admins: admins.length || !members.length ? admins : [members[0]]}, true);
+}
+
+// ---- קבוצות קבועות: לוח בית חינוך (כולם), כל קבוצה מניהול הצוות (בית א/ב/ג, מחנכים, צוות ניהול...), וכל שכבה (מי שמלמד בה) ----
+// נכתבות ע"י המכשיר של ההנהלה כשמשהו משתנה (רק admin רשאי בכללים). "נקרא" וההודעות - כמו כל שיחה.
+const GRADES = ["א", "ב", "ג", "ד", "ה", "ו", "ז", "ח", "ט", "י", "יא", "יב"];
+export function sysGroups() {
+  const act = people().filter(p => !p.off), out = [{id: ALL_CHAT, name: "לוח בית חינוך", icon: "school", members: act.map(p => p.uid)}];
+  for (const g of groups()) out.push({id: "sys_" + g.id.replace(/[^A-Za-z0-9_]/g, ""), name: g.label, icon: g.id === MGMT ? "lock" : "group", members: act.filter(p => p.groups.includes(g.id)).map(p => p.uid)});
+  const gr = (S.T && S.T.grades) || {};
+  for (const g of GRADES) if (gr[g]) { const names = new Set(gr[g]); out.push({id: "sys_gr" + (GRADES.indexOf(g) + 1), name: "שכבה " + g + "׳", icon: "layer", members: act.filter(p => names.has(p.name)).map(p => p.uid)}); }
+  for (const x of out) x.members = [...new Set(x.members)].sort();
+  return out;
+}
+export function syncSysGroups() {
+  if (DEMO && !S.user) return;
+  if (!isAdmin() || !S.staff || !S.T || !S.groupsDoc) return;
+  const want = sysGroups(), key = "adgSysSync", prev = ls(key) || {}, next = {};
+  const jobs = [];
+  for (const g of want) {
+    const sig = g.name + "|" + g.icon + "|" + g.members.join(",");
+    next[g.id] = sig;
+    if (prev[g.id] !== sig) jobs.push(put("chats", g.id, {type: "group", sys: true, name: g.name, icon: g.icon, members: g.members}, true));
+  }
+  for (const id of Object.keys(prev)) if (!next[id]) jobs.push(put("chats", id, {members: []}, true));   // קבוצה שנמחקה בניהול הצוות
+  if (!jobs.length) return;
+  ls(key, next);
+  Promise.all(jobs).catch(() => ls(key, prev));
 }
 
 // ---- לוח אירועים והערכות: נקרא חי מהגיליון (gviz), עם עותק אחרון במכשיר למקרה שאין רשת ----

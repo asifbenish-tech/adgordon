@@ -811,3 +811,42 @@ body:has(.ssel) .dtoast{bottom:calc(var(--tabs) + env(safe-area-inset-bottom,0px
 .chmine li i{color:var(--amber);width:1.2em}
 .chgo{justify-self:start;min-height:44px;display:inline-flex;align-items:center;gap:.4rem;font-weight:700;color:var(--navy-ink);font-size:.98rem}
 .chgo i{font-size:.75rem}
+
+/* שיחות וקבוצות */
+.cvtop{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.6rem}
+.cvtop .btn{flex:1 1 9rem;display:inline-flex;justify-content:center;align-items:center;gap:.45rem}
+.gav{flex:none;width:2.6rem;height:2.6rem;border-radius:50%;display:grid;place-items:center;background:var(--i-teal);color:#fff;font-size:1.05rem}
+.gav.all{background:var(--navy)}
+.sysg{display:inline-block;font-size:.84rem;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:.5rem;padding:0 .35rem;margin-inline-start:.3rem;vertical-align:.1em}
+.chatrow.pinned{background:var(--navy-soft)}
+.chatrow small{display:grid;justify-items:end;gap:.3rem}
+.chatrow .dot{width:.7rem;height:.7rem;border-radius:50%;background:var(--i-blue);display:inline-block}
+.ghead{display:flex;align-items:center;gap:.7rem;padding:.6rem .8rem;margin-bottom:.6rem;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);color:inherit;text-decoration:none;min-height:44px}
+.ghead > span:not(.gav){flex:1;min-width:0;display:grid}
+.ghead b{color:var(--ink);font-size:1.02rem}
+.ghead small{font-size:.9rem;color:var(--muted)}
+.bub .who{display:block;font-size:.88rem;font-weight:700;color:var(--navy-ink);margin-bottom:.1rem}
+.selall{display:inline-block;margin:.2rem 0 .5rem;min-height:44px}
+.ginfo{display:grid;justify-items:center;gap:.4rem;text-align:center;margin-bottom:.8rem}
+.ginfo .gav{width:4.5rem;height:4.5rem;font-size:1.8rem}
+.ginfo h2{margin:0;font-size:1.3rem;color:var(--ink)}
+.ginfo p{margin:0;color:var(--muted);font-size:.94rem}
+.rn{display:flex;gap:.5rem;width:100%;max-width:26rem}
+.rn input{flex:1;min-width:0}
+.rn .btn{width:auto;flex:none;padding-inline:1rem}
+.act.rm{background:var(--red);border:0;cursor:pointer}
+#gml .item{gap:.6rem}
+.btn.sticky{position:sticky;bottom:calc(var(--tabs-h, 4.6rem) + .6rem);width:100%;margin-top:.8rem;box-shadow:0 4px 16px rgba(0,0,0,.15)}
+/* הודעות חשובות בעמוד הבית */
+.notices{display:grid;gap:.5rem;margin-bottom:.8rem}
+.notices h3{margin:0;font-size:1.02rem;color:var(--ink)}
+.notices h3 i{color:var(--i-red);margin-inline-end:.3rem}
+.notice{background:var(--surface);border:1px solid var(--line);border-inline-start:4px solid var(--i-red);border-radius:var(--r);padding:.7rem .9rem;display:grid;gap:.25rem}
+.notice b{font-size:1.04rem;color:var(--ink)}
+.notice p{margin:0;white-space:pre-line;color:var(--text);font-size:.98rem}
+.notice small{font-size:.88rem;color:var(--muted)}
+.nacts{display:flex;flex-wrap:wrap;gap:.2rem 1rem}
+.nacts .link{min-height:44px;display:inline-flex;align-items:center;gap:.3rem;background:none;border:0;padding:0;font:inherit;font-size:.94rem;color:var(--navy-ink);cursor:pointer}
+.nacts .link.danger{color:var(--red)}
+.notices > .btn.small{justify-self:start}
+.nform{display:grid;gap:.6rem}

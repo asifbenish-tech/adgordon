@@ -109,19 +109,41 @@ service cloud.firestore {
       allow read: if staff() && (ch == 'mgmt' ? inGroup('mgmt') : (ch == 'all' || ch == 's_' + request.auth.uid || admin() || inGroup(ch)));
       allow create: if staff() && request.resource.data.by == request.auth.uid
         && (ch != 'mgmt' || inGroup('mgmt'))
-        && (request.resource.data.get('pop', false) != true || admin() || inGroup('mgmt'))
+        && ((request.resource.data.get('pop', false) != true && request.resource.data.get('notice', false) != true) || admin() || inGroup('mgmt'))
         && (ch.size() < 2 || ch[0:2] != 's_' || ch == 's_' + request.auth.uid);
       allow delete: if staff() && (ch != 'mgmt' || inGroup('mgmt')) && (resource.data.by == request.auth.uid || admin());
     }
 
-    // שיחות פרטיות: רק שני המשתתפים. גם ההנהלה לא קוראת.
+    // שיחות: רק המשתתפים קוראים (גם ההנהלה לא קוראת שיחה שהיא לא בה).
+    //   פרטית: chats/<uidA__uidB>, בדיוק שני משתתפים.
+    //   קבוצה: chats/g_<id> - כל איש צוות פותח (ונהיה מנהל הקבוצה); מנהלי הקבוצה משנים שם ומשתתפים; כל אחד יכול לצאת.
+    //   קבוצה קבועה: chats/sys_<key> (לוח בית חינוך, בתים, מחנכים, צוות ניהול, שכבות) - רק ההנהלה כותבת את המשתתפים.
+    //   כל משתתף מעדכן את "ההודעה האחרונה" (last).
     match /chats/{cid} {
+      function d() { return request.resource.data; }
+      function was() { return resource.data; }
+      function changed() { return d().diff(was()).affectedKeys(); }
       allow read: if staff() && request.auth.uid in resource.data.members;
-      allow create: if staff() && request.auth.uid in request.resource.data.members
-        && request.resource.data.members.size() == 2
-        && cid == request.resource.data.members[0] + '__' + request.resource.data.members[1];
-      allow update: if staff() && request.auth.uid in resource.data.members
-        && request.resource.data.members == resource.data.members;
+      allow create: if staff() && !cid.matches('^(g|sys)_.*') && request.auth.uid in d().members
+        && d().members.size() == 2
+        && cid == d().members[0] + '__' + d().members[1];
+      allow create: if staff() && cid.matches('^g_[A-Za-z0-9]{4,30}$') && d().type == 'group' && d().get('sys', false) == false
+        && d().name is string && d().name.size() > 0 && d().name.size() <= 60
+        && request.auth.uid in d().members && d().members.size() <= 400 && d().admins == [request.auth.uid];
+      allow create, update: if admin() && cid.matches('^sys_[A-Za-z0-9_]{1,40}$') && d().sys == true && d().type == 'group';
+      // פרטית: המשתתפים לא משתנים
+      allow update: if staff() && !cid.matches('^(g|sys)_.*') && request.auth.uid in was().members && d().members == was().members;
+      // קבוצה: כל משתתף - רק ההודעה האחרונה
+      allow update: if staff() && cid.matches('^(g|sys)_.*') && request.auth.uid in was().members && changed().hasOnly(['last']);
+      // קבוצה פתוחה: מנהל הקבוצה משנה שם / משתתפים / מנהלים
+      allow update: if staff() && cid.matches('^g_.*') && request.auth.uid in was().get('admins', [])
+        && changed().hasOnly(['name', 'members', 'admins', 'last']) && d().name is string && d().name.size() > 0 && d().name.size() <= 60
+        && d().members.size() <= 400 && d().get('sys', false) == false;
+      // יציאה מקבוצה פתוחה: רק להוריד את עצמי
+      allow update: if staff() && cid.matches('^g_.*') && request.auth.uid in was().members
+        && changed().hasOnly(['members', 'admins'])
+        && d().members == was().members.removeAll([request.auth.uid])
+        && d().admins.toSet().difference(was().get('admins', []).toSet()).size() <= 1;
       match /msgs/{id} {
         allow read: if staff() && request.auth.uid in get(/databases/$(database)/documents/chats/$(cid)).data.members;
         allow create: if staff() && request.resource.data.by == request.auth.uid

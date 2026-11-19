@@ -24,7 +24,7 @@ export const S = {
   mgmt: null,            // הודעות צוות הניהול (תיבה נפרדת, רק לחברי הקבוצה)
   board: null,           // הודעות לוח, ממוזגות מכל הערוצים שלי
   chats: null,           // השיחות הפרטיות שלי
-  chatWith: null, chatMsgs: null,   // השיחה הפתוחה
+  convId: null, chatMsgs: null, notices: null,   // השיחה הפתוחה
   err: ""
 };
 const subs = new Set();

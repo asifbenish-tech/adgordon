@@ -4,13 +4,13 @@ import {DEMO} from "./config.js";
 import {$, esc} from "./util.js";
 import {ui, avatar} from "./ui.js";
 import {initAuth, loginHtml, bindLogin} from "./auth.js";
-import {unreadBoard, unreadChats, unreadMgmt, popPending, ackPop} from "./data.js";
+import {unreadChats, popPending, ackPop} from "./data.js";
 import {syncPush} from "./push.js";
 import home, {dateLine} from "./views/home.js";
 import tt from "./views/tt.js";
 import duty from "./views/duty.js";
 import cal from "./views/cal.js";
-import {msg, chat, pick} from "./views/msg.js";
+import {msg, chat, pick, group, ginfo, newgroup} from "./views/msg.js";
 import staff from "./views/staff.js";
 import profile from "./views/profile.js";
 import menu from "./views/menu.js";
@@ -22,9 +22,9 @@ import reads from "./views/reads.js";
 import seat from "./views/seat.js";
 import dining from "./views/dining.js";
 
-const VIEWS = {home, msg, tt, duty, cal, chat, new: pick, staff, me: menu, edit: profile, portal, bank, tools, seat, dining, daily, changes, reads};
+const VIEWS = {home, msg, tt, duty, cal, chat, group, ginfo, newgroup, new: pick, staff, me: menu, edit: profile, portal, bank, tools, seat, dining, daily, changes, reads};
 // המערכת והשמירות נמצאות באזור האישי (לחיצה על התמונה למעלה)
-const TABS = [["home", "היום", "fa-sun"], ["msg", "הודעות", "fa-comments"], ["new", "צוות", "fa-address-book"], ["portal", "מידע", "fa-book-open"], ["tools", "כלים", "fa-grip"]];
+const TABS = [["home", "היום", "fa-sun"], ["msg", "שיחות", "fa-comments"], ["new", "צוות", "fa-address-book"], ["portal", "מידע", "fa-book-open"], ["tools", "כלים", "fa-grip"]];
 let last = "";
 
 export const route = () => { const [name, arg] = location.hash.replace(/^#\/?/, "").split("/"); return {name: VIEWS[name] ? name : "home", arg: arg ? decodeURIComponent(arg) : ""}; };
@@ -81,7 +81,7 @@ function popCheck() {
 }
 
 function badge() {
-  const em = document.querySelector('#tabs a[data-t="msg"] em'), n = unreadBoard() + unreadChats() + unreadMgmt();
+  const em = document.querySelector('#tabs a[data-t="msg"] em'), n = unreadChats();
   em.hidden = !n; em.textContent = n || "";
 }
 

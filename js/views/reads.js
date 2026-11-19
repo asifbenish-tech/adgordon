@@ -8,7 +8,7 @@ let cur = "", reads = null, unsub = null;
 const find = mid => [...(S.board || []), ...(S.mgmt || [])].find(m => (m.mid || m.id) === mid);
 
 export default {
-  parent: "msg", tab: "msg", live: true,
+  parent: "home", tab: "home", live: true,
   title: () => "מי קרא",
   html(mid) {
     const m = find(mid);

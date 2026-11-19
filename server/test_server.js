@@ -321,6 +321,14 @@ assert.strictEqual(W.pushes[0].data.title, "יש שינוי במערכת שלך"
 W.fsdb["staff/" + uid("רותי")].groups = L(["hA", "mgmt"]);
 [nr, nt] = note({t: rutiTok, kind: "daily", date: "bad", to: [uid("אנה")]}); assert.strictEqual(nt, "tokAnna", "a mgmt member may publish too");
 assert.strictEqual(W.pushes[0].data.url, "#/daily");
+// ---- קבוצות שיחה והודעה חשובה ----
+W.fsdb["chats/g_trip1"] = {type: S1("group"), name: S1("טיול שנתי"), members: L([uid("רותי"), uid("אנה"), uid("חסן")])};
+[nr, nt] = note({t: rutiTok, kind: "group", to: "g_trip1", text: "יוצאים ב-8"}); assert.strictEqual(nt, "tokAnna,tokHasan", "group: everyone in it but the sender");
+assert.deepStrictEqual(W.pushes[0].data, {title: "טיול שנתי", body: "רותי: יוצאים ב-8", url: "#/group/g_trip1"});
+[nr, nt] = note({t: adminTok, kind: "group", to: "g_trip1", text: "x"}); assert.match(nr.error, /לא חבר/); assert.strictEqual(nt, "", "a non-member cannot push to a group");
+[nr, nt] = note({t: rutiTok, kind: "group", to: "chats/../x", text: "x"}); assert.match(nr.error, /לא חבר/);
+[nr, nt] = note({t: teachTok, kind: "board", to: ["all"], title: "x", text: "y", notice: true}); assert.match(nr.error, /הנהלה או צוות ניהול/, "only management posts an important notice");
+[nr, nt] = note({t: adminTok, kind: "board", to: ["all"], title: "חופשה", text: "y", notice: true}); assert.strictEqual(W.pushes[0].data.title, "הודעה חשובה: חופשה");
 W.clearCache(); for (let i = 0; i < 60; i++) W.post({a: "notify", t: rutiTok, kind: "chat", to: uid("חסן"), text: "x"});
 assert.match(W.post({a: "notify", t: rutiTok, kind: "chat", to: uid("חסן"), text: "x"}).error, /יותר מדי/, "rate limit per sender");
 

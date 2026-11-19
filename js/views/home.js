@@ -3,9 +3,9 @@
 // מבנה "נקי ומוכר": שורות מקובצות, טקסט גדול, פעולה אחת בולטת.
 import {S} from "../state.js";
 import {BELLS} from "../config.js";
-import {$, esc, iso, today, parse, DAYN} from "../util.js";
-import {isAdmin, myFull, myDuty, dutyNow, checkIn, checkedIn, allDays, unreadChats, unreadBoard, unreadMgmt, myChanges, chgText} from "../data.js";
-import {loading, empty, secHead, ui, tryDo} from "../ui.js";
+import {$, esc, iso, today, parse, ago, DAYN} from "../util.js";
+import {isAdmin, myFull, myDuty, dutyNow, checkIn, checkedIn, allDays, unreadChats, chatUnread, isGroup, otherOf, person, myChanges, chgText, canPublish, sendNotice, delNotice} from "../data.js";
+import {loading, empty, secHead, field, ui, tryDo} from "../ui.js";
 import {slots} from "./tt.js";
 import {changesCard} from "./changes.js";
 
@@ -61,6 +61,34 @@ function allDayHtml(d) {
     (d.tests.length ? '<a href="#/cal">' + d.tests.length + " הערכות בכיתות ←</a>" : "") + "</div>";
 }
 
+// ---- הודעות חשובות: ההנהלה וצוות הניהול מפרסמים, וזה מופיע בעמוד הבית של כולם (14 ימים, או עד שנמחק) ----
+let addOpen = false;
+const NOTICE_DAYS = 14;
+function noticesHtml() {
+  const list = (S.notices || []).filter(m => m.at > Date.now() - NOTICE_DAYS * 864e5), pub = canPublish();
+  if (!list.length && !pub) return "";
+  let h = '<section class="notices" aria-label="הודעות חשובות">' + (list.length ? "<h3><i class=\"fa-solid fa-bullhorn\"></i> הודעות חשובות</h3>" : "") +
+    list.map(m => '<article class="notice"><b>' + esc(m.title) + "</b>" + (m.body ? "<p>" + esc(m.body) + "</p>" : "") + "<small>" + esc(m.byName || "") + " · " + esc(ago(m.at)) +
+      (m.pop ? ' · <i class="fa-solid fa-bell"></i> קופצת' : "") + "</small>" +
+      (pub || m.by === S.user.uid ? '<div class="nacts">' + (m.pop ? '<a class="link" href="#/reads/' + encodeURIComponent(m.mid || m.id) + '"><i class="fa-solid fa-check-double"></i> מי קרא</a>' : "") +
+        '<button type="button" class="link danger" data-ndel="' + esc(m.mid || m.id) + '"><i class="fa-solid fa-trash-can"></i> הסרה</button></div>' : "") + "</article>").join("");
+  if (pub) h += addOpen ? '<form id="nform" class="card nform">' + field("כותרת", '<input name="title" required maxlength="80">') + field("פירוט (לא חובה)", '<textarea name="body" rows="3" maxlength="1500"></textarea>') +
+      '<label class="check popchk"><input type="checkbox" name="pop"> <span><b>גם הודעה קופצת</b> - תקפוץ לכל אחד עד שיאשר שקרא, ואפשר לראות מי קרא.</span></label>' +
+      '<div class="two"><button class="btn">פרסום לכל הצוות</button><button type="button" class="btn ghost" id="ncancel">ביטול</button></div></form>'
+    : '<button type="button" class="btn ghost small" id="nadd"><i class="fa-solid fa-bullhorn"></i> הודעה חשובה בעמוד הבית</button>';
+  return h + "</section>";
+}
+function bindNotices(el) {
+  const a = $("nadd"); if (a) a.onclick = () => { addOpen = true; ui.render(); const t = el.querySelector("#nform [name=title]"); if (t) t.focus(); };
+  const c = $("ncancel"); if (c) c.onclick = () => { addOpen = false; ui.render(); };
+  const f = $("nform"); if (f) f.onsubmit = async e => {
+    e.preventDefault();
+    const d = new FormData(f), b = f.querySelector(".btn"); b.disabled = true;
+    if (await tryDo(() => sendNotice(String(d.get("title")).trim(), String(d.get("body") || "").trim(), d.get("pop") === "on"))) { addOpen = false; ui.render(); } else b.disabled = false;
+  };
+  for (const b of el.querySelectorAll("[data-ndel]")) b.onclick = () => { const m = (S.notices || []).find(x => (x.mid || x.id) === b.dataset.ndel); if (m && confirm("להסיר את ההודעה מעמוד הבית של כולם?")) tryDo(() => delNotice(m)); };
+}
+
 export default {
   title: () => "היום של " + myFull().split(" ")[0],
   html() {
@@ -71,9 +99,10 @@ export default {
       const k = iso(d), c = byDate(d), cls = [k === today() ? "today" : "", c && c.acts.some(a => a.k === "vac") ? "is-vac" : c && c.acts.length ? "has-ev" : myDays.has(d.getDay()) ? "has-du" : ""].filter(Boolean).join(" ");
       return '<button type="button" data-day="' + k + '" aria-pressed="' + (k === sel) + '"' + (cls ? ' class="' + cls + '"' : "") + ">" + "אבגדהוש"[d.getDay()] + "׳<b>" + d.getDate() + "</b><i></i></button>";
     }).join("") + '</div><a class="wklink" href="#/cal"><i class="fa-solid fa-calendar-days"></i> כל האירועים וההערכות <i class="fa-solid fa-chevron-left"></i></a></div>';
-    // הודעות חדשות: פס אחד, לא מסך
-    const un = unreadBoard() + unreadChats() + unreadMgmt(), last = S.board && S.board[0];
-    if (un) h += '<a class="alert" href="#/msg"><i class="fa-solid fa-envelope"></i><span><b>' + (un === 1 ? "הודעה חדשה" : un + " הודעות חדשות") + "</b>" + (last ? " · " + esc(last.title) : "") + '</span><i class="fa-solid fa-chevron-left go"></i></a>';
+    h += noticesHtml();
+    // הודעות חדשות בשיחות: פס אחד, לא מסך
+    const un = unreadChats(), last = (S.chats || []).find(chatUnread);
+    if (un) h += '<a class="alert" href="#/msg"><i class="fa-solid fa-comments"></i><span><b>' + (un === 1 ? "שיחה עם הודעה חדשה" : un + " שיחות עם הודעות חדשות") + "</b>" + (last ? " · " + esc(isGroup(last) ? last.name : person(otherOf(last)).full) : "") + '</span><i class="fa-solid fa-chevron-left go"></i></a>';
     const isToday = sel === today(), d = parse(sel), c = cal && cal.find(x => x.date === sel);
     h += changesCard(sel);   // לוח השינויים (והתמונה, אם נשלחה, בתוכו)
     h += allDayHtml(c);
@@ -99,6 +128,7 @@ export default {
     return h;
   },
   bind(el) {
+    bindNotices(el);
     for (const b of el.querySelectorAll("[data-day]")) b.onclick = () => { sel = b.dataset.day; ui.render(); };
     const a = $("arrive"); if (a) a.onclick = async () => { const n = dutyNow(); if (!n) return; a.disabled = true; if (await tryDo(() => checkIn(n.slot), "האישור לא נשמר. לבדוק את האינטרנט ולנסות שוב.")) ui.render(); else a.disabled = false; };
   }

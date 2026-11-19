@@ -26,8 +26,10 @@ Firestore של פרויקט `gordon-staff`. קוראים ממנו רק אנשי 
 | `photos/<uid>` | `{data: JPEG קטן כ-data URL, at}` | כל איש צוות, את שלו |
 | `seating/<uid>/classes/<cid>` | `{className, teacher, students:[...], layout, room:{space, items}, seats:[שם או null], nameMode, nameOrder, updated}` - סידור ישיבה | האדם עצמו בלבד (גם לא ההנהלה) |
 | `meta/groups` | `{list:[{id, label}]}` | מסך ניהול הצוות |
-| `channels/<ערוץ>/msgs/<mid>` | `{mid, title, body, to:[...], by:<uid>, byName, at:<ms>}` | כל איש צוות |
+| `channels/all/msgs/<mid>` | הודעה חשובה בעמוד הבית: `{mid, title, body, to:["all"], notice: true, pop?, by, byName, at}` | הנהלה / צוות ניהול |
 | `chats/<uidA__uidB>` + `msgs` | שיחות פרטיות | שני המשתתפים בלבד |
+| `chats/g_<id>` + `msgs` | קבוצת שיחה: `{type: "group", name, members, admins}` | המשתתפים; מנהלי הקבוצה משנים |
+| `chats/sys_<key>` + `msgs` | קבוצה קבועה (לוח בית חינוך `sys_all`, קבוצות ניהול הצוות, שכבות `sys_gr<n>`): `{type: "group", sys: true, name, members}` | ההנהלה (אוטומטית); המשתתפים כותבים הודעות |
 
 אוסף חדש = שורה בטבלה + כלל ב-`firestore.rules` (ובדיקה ב-`tests/rules.test.mjs`) + מסך ב-`js/views`.
 

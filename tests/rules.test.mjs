@@ -187,5 +187,33 @@ await t("dining huge list refused", no(setDoc(doc(T1, "dining/t_one/classes/d3")
 await t("blocked cannot save dining", no(setDoc(doc(B, "dining/t_blocked/classes/d1"), din)));
 await t("delete own dining", ok(deleteDoc(doc(T1, "dining/t_one/classes/d1"))));
 
+// ---- קבוצות שיחה ----
+const T3 = db("t_three", "teacher"), g = {type: "group", name: "טיול", members: ["t_one", "t_two"], admins: ["t_one"], by: "t_one", at: 1};
+await t("any staff opens a group", ok(setDoc(doc(T1, "chats/g_abcd1"), g)));
+await t("group creator must be the only admin", no(setDoc(doc(T1, "chats/g_abcd2"), {...g, admins: ["t_one", "t_two"]})));
+await t("cannot open a group without self", no(setDoc(doc(T1, "chats/g_abcd3"), {...g, members: ["t_two"]})));
+await t("cannot open a group marked fixed", no(setDoc(doc(T1, "chats/g_abcd4"), {...g, sys: true})));
+await t("teacher cannot write a fixed group", no(setDoc(doc(T1, "chats/sys_hA"), {type: "group", sys: true, name: "בית א", members: ["t_one"]})));
+await t("admin writes a fixed group", ok(setDoc(doc(A, "chats/sys_hA"), {type: "group", sys: true, name: "בית א", members: ["t_one", "t_two"]}, {merge: true})));
+await t("admin of the school is not a member - cannot read it", no(getDoc(doc(A, "chats/sys_hA"))));
+await t("member reads fixed group", ok(getDoc(doc(T2, "chats/sys_hA"))));
+await t("member writes in fixed group", ok(addDoc(collection(T2, "chats/sys_hA/msgs"), {by: "t_two", text: "hi", at: 1})));
+await t("member updates last of fixed group", ok(updateDoc(doc(T2, "chats/sys_hA"), {last: {text: "hi", at: 2, by: "t_two"}})));
+await t("member cannot add people to fixed group", no(updateDoc(doc(T2, "chats/sys_hA"), {members: ["t_one", "t_two", "t_three"]})));
+await t("non-member cannot write in group", no(addDoc(collection(T3, "chats/g_abcd1/msgs"), {by: "t_three", text: "x", at: 1})));
+await t("non-member cannot read group messages", no(getDocs(collection(T3, "chats/g_abcd1/msgs"))));
+await t("member writes in group", ok(addDoc(collection(T2, "chats/g_abcd1/msgs"), {by: "t_two", text: "x", at: 1})));
+await t("member (not group admin) cannot rename", no(updateDoc(doc(T2, "chats/g_abcd1"), {name: "אחר"})));
+await t("member cannot add people", no(updateDoc(doc(T2, "chats/g_abcd1"), {members: ["t_one", "t_two", "t_three"]})));
+await t("group admin adds people and renames", ok(updateDoc(doc(T1, "chats/g_abcd1"), {name: "טיול שנתי", members: ["t_one", "t_two", "t_three"]})));
+await t("group admin cannot make it fixed", no(updateDoc(doc(T1, "chats/g_abcd1"), {sys: true})));
+await t("member leaves the group", ok(updateDoc(doc(T3, "chats/g_abcd1"), {members: ["t_one", "t_two"], admins: ["t_one"]})));
+await t("member cannot remove someone else", no(updateDoc(doc(T2, "chats/g_abcd1"), {members: ["t_two"], admins: ["t_one"]})));
+await t("member lists groups too", ok(getDocs(query(collection(T2, "chats"), where("members", "array-contains", "t_two")))));
+// הודעה חשובה בעמוד הבית: רק הנהלה / צוות ניהול
+const nt = by => ({mid: "n1", title: "x", body: "y", by, at: 1, to: ["all"], notice: true});
+await t("teacher cannot post an important notice", no(setDoc(doc(T2, "channels/all/msgs/n1"), nt("t_two"))));
+await t("admin posts an important notice", ok(setDoc(doc(A, "channels/all/msgs/n1"), nt("t_admin"))));
+
 await env.cleanup();
 console.log(process.exitCode ? "rules: FAILURES above" : "firestore.rules: all " + n + " checks passed");
