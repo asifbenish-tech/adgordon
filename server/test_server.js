@@ -393,6 +393,23 @@ W.sgdb["schools/main/config/staffapp_changes_2026-11-12"] = sgSnap([R3, {h: 6, c
 rep = W.env.checkChanges();
 assert.match(rep, /באפליקציית הצוות יש שינויים להיום: 2 שורות/, "pulled right away, even at night");
 assert.match(rep, /שמות שלא זוהו.*זיוה/);
+// ---- זיהוי לפי ת"ז / גיבוב הת"ז (השם במערכת השעות שונה), והם לא נשארים בעותק שכל הצוות קורא ----
+W.fsdb["staffAuth/" + uid("חסן")] = Object.assign({}, W.fsdb["staffAuth/" + uid("חסן")] || {name: S1("חסן")}, {h: L(["hhHASAN"])});
+W.fsdb["staffAuth/" + uid("אנה")] = Object.assign({}, W.fsdb["staffAuth/" + uid("אנה")] || {name: S1("אנה")}, {tz: S1("012345678")});
+W.sgdb["schools/main/config/staffapp_changes_2026-11-12"] = sgSnap([
+  {h: 4, cls: "ט2", items: [{t: "tX", tn: "ח. אבו-ריא", tz: "987654321", h: "hhHASAN", subj: "ספורט", why: "absent", sub: {id: "tY", name: "א. ז.", tz: "12345678", h: "hhUNKNOWN"}}]},
+  {h: 5, cls: "ח2", items: [], cancel: "בוטל", teachers: [{t: "tY", tn: "מישהי", tz: "012345678", h: "nope"}]}]);
+W.sgdb["schools/main/config/staffapp_changes_2026-11-12"].value.stringValue = W.sgdb["schools/main/config/staffapp_changes_2026-11-12"].value.stringValue.replace('"absent":[{', '"absent":[{"tz":"987654321","h":"hhHASAN",');
+at("2026-11-12T11:00:00+02:00");
+const v2 = chg();
+assert.strictEqual(v2.rows[0].items[0].u, uid("חסן"), "matched by the ID hash although the name differs");
+assert.strictEqual(v2.rows[0].items[0].sub.u, uid("אנה"), "matched by the ID (leading zero restored)");
+assert.strictEqual(v2.rows[1].teachers[0].u, uid("אנה"));
+assert.strictEqual(v2.absent[0].u, uid("חסן"));
+const raw2 = W.fsdb["changes/2026-11-12"].value.stringValue;
+assert.ok(!/987654321|012345678|12345678|hhHASAN|hhUNKNOWN|"tz"/.test(raw2), "no ID or ID hash in the copy every staff member reads");
+assert.strictEqual(v2.rows[0].h, 4, "the row's hour (also called h) is kept");
+assert.ok(v2.mine[uid("חסן")] && v2.mine[uid("אנה")], "both get their personal changes");
 delete W.props.SG_KEY; assert.match(W.env.checkChanges(), /✗ אין SG_KEY/);
 W.props.SG_KEY = JSON.stringify(Object.assign({}, SA, {project_id: "other"}));
 assert.strictEqual(at("2026-11-12T08:00:00+02:00"), 0, "a key of another project is refused, without breaking tick");

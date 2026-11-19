@@ -52,6 +52,8 @@ await t("phone too long refused", no(setDoc(doc(T1, "staff/t_one"), {phone: "1".
 await t("reads own login record", ok(getDoc(doc(T1, "staffAuth/t_one"))));
 await t("cannot read another's login record", no(getDoc(doc(T2, "staffAuth/t_one"))));
 await t("updates own email", ok(setDoc(doc(T1, "staffAuth/t_one"), {email: "new@b.c"}, {merge: true})));
+await t("admin stores the ID (tz) in the private login record", ok(setDoc(doc(A, "staffAuth/t_one"), {tz: "012345678"}, {merge: true})));
+await t("cannot change own ID (tz)", no(setDoc(doc(T1, "staffAuth/t_one"), {tz: "111111111"}, {merge: true})));
 await t("cannot replace own id hash", no(setDoc(doc(T1, "staffAuth/t_one"), {h: ["other"]}, {merge: true})));
 await t("cannot change own role in login record", no(setDoc(doc(T1, "staffAuth/t_one"), {email: "x@y.z", role: "admin"}, {merge: true})));
 await t("cannot create own login record", no(setDoc(doc(T2, "staffAuth/t_two"), {email: "x@y.z"}, {merge: true})));

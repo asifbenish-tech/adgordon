@@ -406,23 +406,29 @@ function syncChanges_(date, sa, canPush) {
   var old = fsGet_("changes/" + date);
   if (old && old.src === src) { c.put("sgv_" + date, src, 21600); return 0; }
   var snap = JSON.parse(raw), map = teacherMap_(), mine = {}, sig = {};
-  var u = function (id, name) { return (id && map.byId[id]) || (name && map.byName[norm_(name)]) || ""; };
+  // זיהוי איש הצוות: קודם לפי גיבוב הת"ז (h) או הת"ז (tz) מול staffAuth, ורק אם אין - לפי id של מערכת השעות (app_map) ואז שם.
+  // אחר כך הת"ז והגיבוב נמחקים מהעותק: changes/<תאריך> נקרא ע"י כל הצוות, והת"ז נשמרת רק במאגרים פרטיים.
+  var u = function (x, id, name) {
+    var r = (x.h && map.byH[x.h]) || (x.tz && map.byTz[tz_(x.tz)]) || (id && map.byId[id]) || (name && map.byName[norm_(name)]) || "";
+    delete x.h; delete x.tz;
+    return r;
+  };
   var add = function (uid, x) { if (uid) (mine[uid] = mine[uid] || []).push(x); };
   (snap.rows || []).forEach(function (row) {
-    var base = {h: row.h, cls: row.cls};
+    var base = {h: row.h, cls: row.cls};   // כאן h = מספר השעה
     (row.items || []).forEach(function (it) {
-      it.u = u(it.t, it.tn); if (it.sub) it.sub.u = u(it.sub.id, it.sub.name);
+      it.u = u(it, it.t, it.tn); if (it.sub) it.sub.u = u(it.sub, it.sub.id, it.sub.name);
       add(it.u, ext_(base, {k: "out", who: it.sub ? it.sub.name : "", subj: it.subj, why: it.why}));
       if (it.sub) add(it.sub.u, ext_(base, {k: "in", who: it.tn, subj: it.subj}));
     });
     (row.overrides || []).forEach(function (o) {
-      o.u = u(o.t, o.tn); o.sub.u = u(o.sub.id, o.sub.name);
+      o.u = u(o, o.t, o.tn); o.sub = o.sub || {}; o.sub.u = u(o.sub, o.sub.id, o.sub.name);
       if (o.u !== o.sub.u) add(o.u, ext_(base, {k: "out", who: o.sub.name, subj: o.subj}));
       add(o.sub.u, ext_(base, {k: "in", who: o.tn, subj: o.subj, note: o.note}));
     });
-    if (row.cancel) (row.teachers || []).forEach(function (t) { t.u = u(t.t, t.tn); add(t.u, ext_(base, {k: "cancel", note: row.cancel})); });
+    (row.teachers || []).forEach(function (t) { t.u = u(t, t.t, t.tn); if (row.cancel) add(t.u, ext_(base, {k: "cancel", note: row.cancel})); });
   });
-  (snap.absent || []).forEach(function (a) { a.u = u(a.t, a.tn); });
+  (snap.absent || []).forEach(function (a) { a.u = u(a, a.t, a.tn); });
   snap.mine = mine;
   Object.keys(mine).forEach(function (id) { sig[id] = digest_(JSON.stringify(mine[id])).slice(0, 16); });
   // at = מתי מערכת השעות שמרה (זה מה שמוצג כ"עודכן ב-"), copied = מתי הועתק לכאן
@@ -478,13 +484,15 @@ function chgLine_(x) {
   if (x.k === "cancel") return at + "השיעור בוטל";
   return at + (x.who ? "מחליף/ה: " + x.who : "השיעור שלך מוחלף");
 }
+// ת"ז = 9 ספרות עם אפסים מובילים
+function tz_(x) { var d = String(x == null ? "" : x).replace(/\D/g, ""); return d ? ("000000000" + d).slice(-9) : ""; }
 function norm_(s) { return String(s || "").replace(/["'׳״\s]+/g, " ").trim(); }
 // מזהי המורים בניהול גורדון -> uid כאן. app_map.teachers בלוח המערכות: {שם בלוח: {app_id, full_name}}.
 // ואם אין התאמה - לפי שם: השם בלוח, שם מלא, או כינוי ממאגר הצוות.
 function teacherMap_() {
   var c = CacheService.getScriptCache(), hit = c.get("tmap");
   if (hit) return JSON.parse(hit);
-  var m = {byId: {}, byName: {}}, tt = {};
+  var m = {byId: {}, byName: {}, byH: {}, byTz: {}}, tt = {};
   try { tt = JSON.parse(UrlFetchApp.fetch(TT_URL, {muteHttpExceptions: true}).getContentText()); } catch (err) {}
   var at = (tt.app_map && tt.app_map.teachers) || {};
   Object.keys(at).forEach(function (n) {
@@ -493,9 +501,16 @@ function teacherMap_() {
     m.byName[norm_(n)] = id; if (at[n] && at[n].full_name) m.byName[norm_(at[n].full_name)] = id;
   });
   Object.keys(tt.full_names || {}).forEach(function (n) { m.byName[norm_(tt.full_names[n])] = m.byName[norm_(tt.full_names[n])] || uidOf_(n); });
+  var gone = {};
   fsList_("staff").forEach(function (x) {
-    if (x.removed) return;
+    if (x.removed) { gone[x.id] = 1; return; }
     [x.name, x.full].concat(x.aliases || []).forEach(function (n) { if (n) m.byName[norm_(n)] = x.id; });
+  });
+  // ת"ז וגיבובים מ-staffAuth (פרטי: הנהלה ושרתים בלבד). מטמון הסקריפט פרטי גם הוא.
+  fsList_("staffAuth").forEach(function (x) {
+    if (gone[x.id]) return;
+    (x.h || []).forEach(function (h) { if (h) m.byH[h] = x.id; });
+    if (x.tz) m.byTz[tz_(x.tz)] = x.id;
   });
   c.put("tmap", JSON.stringify(m), 3600);
   return m;
