@@ -325,7 +325,7 @@ W.clearCache(); for (let i = 0; i < 60; i++) W.post({a: "notify", t: rutiTok, ki
 assert.match(W.post({a: "notify", t: rutiTok, kind: "chat", to: uid("חסן"), text: "x"}).error, /יותר מדי/, "rate limit per sender");
 
 // ---- השינויים במערכת מניהול גורדון ----
-const sgSnap = rows => ({value: S1(JSON.stringify({date: "2026-11-12", rows, absent: [{t: "tR", tn: "רותי כהן", hours: null}]}))});
+const sgSnap = rows => ({value: S1(JSON.stringify({date: "2026-11-12", rows, absent: [{t: "tR", tn: "רותי כהן", hours: null}]})), at: {integerValue: "1763000000000"}});
 const R3 = {h: 3, classId: "c1", cls: "ז1", items: [{t: "tR", tn: "רותי כהן", subj: "מתמטיקה", why: "absent", ev: "", sub: {id: "tA", name: "אנה ז"}}]};
 const R5 = {h: 5, classId: "c2", cls: "ח2", items: [], cancel: "בוטל", teachers: [{t: "tH", tn: "חסן"}]};
 W.sgdb["schools/main/config/staffapp_changes_2026-11-12"] = sgSnap([R3, R5]);
@@ -345,6 +345,7 @@ assert.strictEqual(chg().rows[0].items[0].sub.u, uid("אנה"));
 assert.strictEqual(chg().rows[1].teachers[0].u, uid("חסן"), "no app id: matched by name in the staff list");
 assert.strictEqual(chg().absent[0].u, uid("רותי"));
 assert.deepStrictEqual(Object.keys(chg().mine).sort(), [uid("רותי"), uid("אנה"), uid("חסן")].sort());
+assert.strictEqual(W.fsdb["changes/2026-11-12"].at.integerValue, "1763000000000", "'updated at' = when the timetable system saved it");
 assert.strictEqual(at("2026-11-12T08:05:00+02:00"), 0, "same changes: no second alert"); assert.strictEqual(W.pushes.length, 0);
 W.sgdb["schools/main/config/staffapp_changes_2026-11-12"] = sgSnap([R3]);
 assert.strictEqual(at("2026-11-12T08:10:00+02:00"), 1, "only the teacher whose change went away");
@@ -374,6 +375,15 @@ assert.strictEqual(pd().tokHasan.title, "מערכת השינויים עלתה");
 W.sgdb["schools/main/config/staffapp_image_2026-11-12"] = img(9500, "none");
 assert.strictEqual(at("2026-11-12T08:40:00+02:00"), 0, "'none': replaced quietly");
 assert.strictEqual(W.fsdb["daily/2026-11-12"].at.integerValue, "9500");
+// עד שבועיים קדימה: נשמר בלי התראות; ימים רחוקים נבדקים כל רבע שעה
+W.sgdb["schools/main/config/staffapp_changes_2026-11-24"] = sgSnap([R3]);
+assert.strictEqual(at("2026-11-12T10:00:00+02:00"), 0, "a day 12 days ahead: copied, no alert");
+assert.ok(W.fsdb["changes/2026-11-24"], "two weeks ahead are copied");
+W.sgdb["schools/main/config/staffapp_changes_2026-11-25"] = sgSnap([R3]);
+at("2026-11-12T10:05:00+02:00"); assert.ok(!W.fsdb["changes/2026-11-25"], "far days wait for the quarter-hour run");
+at("2026-11-12T10:15:00+02:00"); assert.ok(W.fsdb["changes/2026-11-25"]);
+assert.ok(!W.fsdb["changes/2026-11-14"], "no saturday");
+assert.deepStrictEqual(W.env.chgDays_("2026-11-12", 14).length, 13);
 W.setNow("2026-11-12T23:30:00+02:00"); W.clearCache();
 let rep = W.env.checkChanges();
 assert.match(rep, /✓ SG_KEY קיים/); assert.match(rep, /נמצא בניהול גורדון תקציר להיום: 1 שורות/);

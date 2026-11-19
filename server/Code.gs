@@ -375,15 +375,25 @@ function changesTick_(date, day, mins) {
   var sa, sent = 0;
   try { sa = sgKey_(); } catch (err) { logOnce_("sgkey", err.message); return 0; }
   if (!sa) return 0;
-  var next = new Date(Date.parse(date + "T12:00:00Z") + (day === 5 ? 2 : 1) * 86400000).toISOString().slice(0, 10);
-  [date, next].forEach(function (d) {
-    var push = mins >= CHG_PUSH[0] && mins <= CHG_PUSH[1] && (day !== 6 || mins >= 19 * 60);
-    try { sent += syncChanges_(d, sa, push); }
+  // היום ועד שבועיים קדימה (בלי שבת). היום ויום הלימודים הבא - כל 5 דקות ועם התראות; השאר - כל רבע שעה, בלי התראות.
+  var next = new Date(Date.parse(date + "T12:00:00Z") + (day === 5 ? 2 : 1) * 86400000).toISOString().slice(0, 10), soon = {};
+  soon[date] = 1; soon[next] = 1;
+  var canPush = mins >= CHG_PUSH[0] && mins <= CHG_PUSH[1] && (day !== 6 || mins >= 19 * 60);
+  chgDays_(date, CHG_DAYS).forEach(function (d) {
+    if (!soon[d] && mins % 15 >= 5) return;
+    try { sent += syncChanges_(d, sa, canPush && !!soon[d]); }
     catch (err) { logOnce_("sg_" + d, err.message); }
-    try { sent += syncImage_(d, sa, push); }
+    try { sent += syncImage_(d, sa, canPush && !!soon[d]); }
     catch (err) { logOnce_("sgi_" + d, err.message); }
   });
   return sent;
+}
+var CHG_DAYS = 14;
+// התאריכים מהיום ועד n ימים קדימה, בלי שבת
+function chgDays_(date, n) {
+  var out = [], t = Date.parse(date + "T12:00:00Z");
+  for (var i = 0; i <= n; i++) { var d = new Date(t + i * 86400000); if (d.getUTCDay() !== 6) out.push(d.toISOString().slice(0, 10)); }
+  return out;
 }
 function logOnce_(k, msg) { var c = CacheService.getScriptCache(); if (!c.get("e_" + k)) { c.put("e_" + k, "1", 3600); log_("error", k, msg); } }
 function syncChanges_(date, sa, canPush) {
@@ -391,7 +401,7 @@ function syncChanges_(date, sa, canPush) {
   var r = UrlFetchApp.fetch(SG_FS + "schools/main/config/staffapp_changes_" + date, {headers: {Authorization: "Bearer " + saToken_(sa, "sgoauth", "https://www.googleapis.com/auth/datastore")}, muteHttpExceptions: true});
   if (r.getResponseCode() === 404) return 0;   // אין תקציר ליום הזה (עוד לא נפתח המסך היומי)
   if (r.getResponseCode() !== 200) throw new Error("קריאה מניהול גורדון נכשלה: " + r.getResponseCode());
-  var raw = fsObj_(JSON.parse(r.getContentText()).fields || {}).value || "", src = digest_(raw);
+  var doc = fsObj_(JSON.parse(r.getContentText()).fields || {}), raw = doc.value || "", src = digest_(raw), srcAt = Number(doc.at) || 0;
   if (c.get("sgv_" + date) === src) return 0;
   var old = fsGet_("changes/" + date);
   if (old && old.src === src) { c.put("sgv_" + date, src, 21600); return 0; }
@@ -415,7 +425,8 @@ function syncChanges_(date, sa, canPush) {
   (snap.absent || []).forEach(function (a) { a.u = u(a.t, a.tn); });
   snap.mine = mine;
   Object.keys(mine).forEach(function (id) { sig[id] = digest_(JSON.stringify(mine[id])).slice(0, 16); });
-  fsPatch_("changes/" + date, {date: date, value: JSON.stringify(snap), sig: sig, src: src, at: Date.now()});
+  // at = מתי מערכת השעות שמרה (זה מה שמוצג כ"עודכן ב-"), copied = מתי הועתק לכאן
+  fsPatch_("changes/" + date, {date: date, value: JSON.stringify(snap), sig: sig, src: src, at: srcAt || Date.now(), copied: Date.now()});
   c.put("sgv_" + date, src, 21600);
   if (!canPush) return 0;
   // התראה: למי שיש לו שינוי חדש/אחר, ולמי שהשינוי שלו בוטל

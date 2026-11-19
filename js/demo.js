@@ -36,7 +36,11 @@ export function seed() {
       {h: 7, cls: "ו2", items: [], cancel: "שחרור מוקדם", teachers: [{tn: o(4), u: u(4)}]}].sort((a, b) => a.h - b.h);
     db.changes = [{id: dd(0), date: dd(0), at: now - H, value: JSON.stringify({date: dd(0), rows, note: "יום טיול לשכבת ז",
       absent: [{tn: o(2), u: u(2), hours: null}, {tn: o(3), u: u(3), hours: [6]}],
-      mine: {[me.uid]: [{h: first[2], cls: "ז1", k: "out", who: o(1), subj: first[3]}, {h: free, cls: "ח2", k: "in", who: o(2), subj: "מתמטיקה"}]}})}];
+      mine: {[me.uid]: [{h: first[2], cls: "ז1", k: "out", who: o(1), subj: first[3]}, {h: free, cls: "ח2", k: "in", who: o(2), subj: "מתמטיקה"}]}})},
+      {id: dd(1), date: dd(1), at: now - 3 * H, value: JSON.stringify({date: dd(1), rows: [
+        {h: 2, cls: "ה1", items: [{tn: o(3), u: u(3), subj: "מדעים", why: "absent", ev: "", sub: {name: o(4), u: u(4)}}]},
+        {h: 2, cls: "ו3", items: [{tn: o(2), u: u(2), subj: "עברית", why: "event", ev: "השתלמות", sub: null}], note: "הכיתה בספרייה"}],
+        absent: [{tn: o(3), u: u(3), hours: [1, 2]}], mine: {}})}];
   }
   db["chats/" + cid + "/msgs"] = [
     {id: "c1", by: me.uid, text: "היי, אפשר להחליף איתך שמירה ביום שלישי?", at: now - 3 * H},

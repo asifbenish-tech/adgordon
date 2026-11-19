@@ -755,19 +755,40 @@ body:has(.ssel) .dtoast{bottom:calc(var(--tabs) + env(safe-area-inset-bottom,0px
 .tl .off b{text-decoration:line-through;text-decoration-thickness:1px;color:var(--muted)}
 .tl .add{background:var(--amber-soft)}
 .chgcard.mine{border-inline-start:4px solid var(--amber)}
-ul.chg{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-ul.chg>li{display:grid;grid-template-columns:3rem 1fr;gap:.8rem;padding:.8rem 1rem;border-bottom:1px solid var(--line-2)}
-ul.chg>li:last-child{border-bottom:0}
-ul.chg .ch{text-align:center;color:var(--muted)}
-ul.chg .ch small{display:block;font-size:.88rem}
-ul.chg .ch b{font-size:1.3rem;color:var(--navy-ink)}
-ul.chg .cw{min-width:0;display:grid;gap:.45rem}
-ul.chg .cls{font-weight:700;color:var(--navy-ink);font-size:1rem}
-ul.chg .ci{display:flex;flex-wrap:wrap;gap:.15rem .6rem;align-items:baseline;padding:.35rem .55rem;border-radius:.6rem;background:var(--bg)}
-ul.chg .ci.mine{background:var(--amber-soft);outline:1px solid var(--amber)}
-ul.chg .ci b{font-weight:600;color:var(--ink)}
-ul.chg .why{font-size:.9rem;color:var(--muted)}
-ul.chg .to{font-size:.94rem;font-weight:600;color:var(--green)}
-ul.chg .to.none{color:var(--red)}
-ul.chg .cnote,.absent{margin:0;font-size:.92rem;color:var(--muted)}
+/* לוח השינויים */
+.cdays{display:flex;gap:.45rem;overflow-x:auto;padding:.1rem .1rem .6rem;margin-bottom:.4rem;scrollbar-width:none}
+.cdays::-webkit-scrollbar{display:none}
+.cdays a{flex:none;min-width:4.4rem;min-height:44px;display:grid;justify-items:center;gap:.05rem;padding:.45rem .5rem;border-radius:.9rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-decoration:none}
+.cdays a b{font-size:.94rem;font-weight:700}
+.cdays a small{font-size:.88rem;color:var(--muted)}
+.cdays a i{font-style:normal;font-size:.88rem;font-weight:700;color:var(--muted);min-height:1.2em}
+.cdays a.mine i{color:var(--amber)}
+.cdays a[aria-current="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.cdays a[aria-current="true"] small,.cdays a[aria-current="true"] i{color:#fff}
+.cabsent{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:.7rem 1rem;margin-bottom:.4rem}
+.cabsent b{font-size:.96rem;color:var(--ink)}
+.cabsent ul{list-style:none;margin:.35rem 0 0;padding:0;display:flex;flex-wrap:wrap;gap:.35rem}
+.cabsent li{font-size:.92rem;background:var(--bg);border-radius:.6rem;padding:.2rem .6rem;color:var(--text)}
+.cabsent li.mine{background:var(--amber-soft);outline:1px solid var(--amber);font-weight:700}
+.cabsent small{font-size:.88rem;color:var(--muted)}
+.cbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;justify-content:space-between;margin:1.2rem 0 .5rem}
+.cbar h3{margin:0;font-size:1.04rem;color:var(--ink)}
+.switch{display:inline-flex;align-items:center;gap:.5rem;min-height:44px;font-size:.94rem;font-weight:600;color:var(--ink);cursor:pointer}
+.switch input{width:1.3rem;height:1.3rem;accent-color:var(--navy)}
+.chg{display:grid;gap:.7rem}
+.chour{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.chour h4{margin:0;display:flex;gap:.6rem;align-items:baseline;padding:.55rem 1rem;background:var(--navy-soft);color:var(--navy-ink);font-size:1.02rem}
+.chour h4 small{font-size:.88rem;font-weight:500;color:var(--muted);direction:ltr}
+.ccls{display:grid;gap:.4rem;padding:.7rem 1rem;border-top:1px solid var(--line-2)}
+.chour h4+.ccls{border-top:0}
+.ccls .cls{font-weight:700;color:var(--navy-ink);font-size:1rem}
+.chg .ci{display:flex;flex-wrap:wrap;gap:.15rem .6rem;align-items:baseline;padding:.4rem .6rem;border-radius:.6rem;background:var(--bg)}
+.chg .ci.mine{background:var(--amber-soft);outline:2px solid var(--amber)}
+.chg .ci .me{font-size:.84rem;font-weight:700;color:#fff;background:var(--amber);border-radius:.45rem;padding:0 .4rem}
+.chg .ci b{font-weight:600;color:var(--ink)}
+.chg .why{font-size:.9rem;color:var(--muted)}
+.chg .to{font-size:.94rem;font-weight:600;color:var(--green)}
+.chg .to.none{color:var(--red)}
+.chg .cnote,.cnote{margin:0;font-size:.92rem;color:var(--muted)}
+.btn.cimg{display:flex;justify-content:center;gap:.5rem;align-items:center;margin-top:1rem}
 .daynote{margin:0 0 .6rem!important}

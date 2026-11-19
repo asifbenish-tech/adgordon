@@ -4,10 +4,9 @@
 import {S} from "../state.js";
 import {BELLS} from "../config.js";
 import {$, esc, iso, today, parse, DAYN} from "../util.js";
-import {isAdmin, myFull, myDuty, dutyNow, checkIn, checkedIn, allDays, unreadChats, unreadBoard, unreadMgmt, watchChanges, myChanges, chgText} from "../data.js";
+import {isAdmin, myFull, myDuty, dutyNow, checkIn, checkedIn, allDays, unreadChats, unreadBoard, unreadMgmt, myChanges, chgText} from "../data.js";
 import {loading, empty, secHead, ui, tryDo} from "../ui.js";
 import {slots} from "./tt.js";
-import {dailyCard} from "./daily.js";
 import {changesCard} from "./changes.js";
 
 const SIDES = {"יסודי": "#2c8a7e", "חטיבה": "#2f6fd1", 'תל"ן': "#c98a12", "מגמות": "#cf4b3a", "סדירות": "#6c5fbf"};
@@ -76,9 +75,7 @@ export default {
     const un = unreadBoard() + unreadChats() + unreadMgmt(), last = S.board && S.board[0];
     if (un) h += '<a class="alert" href="#/msg"><i class="fa-solid fa-envelope"></i><span><b>' + (un === 1 ? "הודעה חדשה" : un + " הודעות חדשות") + "</b>" + (last ? " · " + esc(last.title) : "") + '</span><i class="fa-solid fa-chevron-left go"></i></a>';
     const isToday = sel === today(), d = parse(sel), c = cal && cal.find(x => x.date === sel);
-    watchChanges(sel);
-    h += changesCard(sel);
-    h += dailyCard(sel);
+    h += changesCard(sel);   // לוח השינויים (והתמונה, אם נשלחה, בתוכו)
     h += allDayHtml(c);
     h += secHead(isToday ? "היום שלי" : "יום " + DAYN[d.getDay()] + " " + d.getDate() + "." + (d.getMonth() + 1), "#/tt", "המערכת השבועית");
     if (!S.T || !S.duty || !S.staff) h += loading;
@@ -95,6 +92,7 @@ export default {
         "</b><span>יום " + DAYN[dt.getDay()] + " " + dt.getDate() + "." + (dt.getMonth() + 1) + (x.acts.length > 1 ? " · ועוד " + (x.acts.length - 1) : "") + '</span></div><i class="fa-solid fa-chevron-left go"></i></a>';
     }).join("") + "</div>";
     h += secHead("קיצורי דרך") + '<div class="list">' +
+      '<a class="item" href="#/changes"><div class="ico blue"><i class="fa-solid fa-shuffle"></i></div><div><b>לוח שינויים</b><span>היום, מחר ועד שבועיים קדימה</span></div><i class="fa-solid fa-chevron-left go"></i></a>' +
       '<a class="item" href="#/duty"><div class="ico gold"><i class="fa-solid fa-shield-halved"></i></div><div><b>תורנות שמירה</b><span>השמירות שלי והלוח המלא</span></div><i class="fa-solid fa-chevron-left go"></i></a>' +
       '<a class="item" href="#/cal"><div class="ico blue"><i class="fa-solid fa-calendar-days"></i></div><div><b>לוח אירועים והערכות</b><span>חגים, טיולים, מבחנים לפי חודש</span></div><i class="fa-solid fa-chevron-left go"></i></a>' +
       "</div>";
