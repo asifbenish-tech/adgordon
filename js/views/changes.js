@@ -34,12 +34,15 @@ export function changesCard(date) {
   const c = S.changes[date], img = S.daily[date], n = count(c), mine = myChanges(date);
   if (!n && !img) return "";
   const at = c && c.at ? c.at : img && img.at;
-  return '<a class="chghome' + (mine.length ? " mine" : "") + '" href="#/changes/' + date + '">' +
+  // הכרטיס עצמו לא קישור: התמונה פותחת את התמונה בגדול (#/daily), והשאר פותח את לוח השינויים
+  const go = '<a class="chlink" href="#/changes/' + date + '">';
+  return '<div class="chghome' + (mine.length ? " mine" : "") + '">' + go +
     '<div class="chhead"><b><i class="fa-solid fa-shuffle"></i> מערכת השינויים' + (date === today() ? " להיום" : "") + "</b>" + (at ? "<span>עודכן ב-" + hhmm(at) + "</span>" : "") + "</div>" +
     (mine.length ? '<div class="chmine"><b><i class="fa-solid fa-circle-exclamation"></i> ' + (mine.length === 1 ? "יש לך שינוי" : "יש לך " + mine.length + " שינויים") + "</b><ul>" +
       mine.map(x => "<li><i class=\"fa-solid " + (x.k === "in" ? "fa-person-chalkboard" : x.k === "cancel" ? "fa-ban" : "fa-shuffle") + "\"></i> שעה " + x.h + " · " + esc(x.cls) + " · " + esc(chgText(x)) + "</li>").join("") + "</ul></div>" : "") +
-    (img ? '<img src="' + esc(img.data) + '" alt="מערכת השינויים">' : "") +
-    '<span class="chgo">' + (n ? "לכל השינויים בבית החינוך (" + n + ")" : "לפתיחת מערכת השינויים") + ' <i class="fa-solid fa-chevron-left"></i></span></a>';
+    "</a>" +
+    (img ? '<a class="chimg" href="#/daily/' + date + '" aria-label="פתיחת התמונה בגדול"><img src="' + esc(img.data) + '" alt="מערכת השינויים"><span class="zoomtag"><i class="fa-solid fa-magnifying-glass-plus"></i> לפתיחה בגדול</span></a>' : "") +
+    go + '<span class="chgo">' + (n ? "לכל השינויים בבית החינוך (" + n + ")" : "ללוח השינויים") + ' <i class="fa-solid fa-chevron-left"></i></span></a></div>';
 }
 
 function itemHtml(it, me) {
