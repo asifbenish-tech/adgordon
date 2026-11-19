@@ -3,7 +3,7 @@
 // הצפייה: הגדלה בכפתורים או בצביטה, גלילה בתוך התמונה. ההעלאה: בחירת תמונה, הערה, ולמי לשלוח התראה.
 import {S} from "../state.js";
 import {$, esc, today, parse, hhmm, DAYN} from "../util.js";
-import {canPublish, watchDaily, saveDaily, delDaily, people} from "../data.js";
+import {canPublish, watchDaily, saveDaily, people} from "../data.js";
 import {loading, empty, field, avatar, ui, tryDo} from "../ui.js";
 
 const MAX_CHARS = 900000;          // גבול בטוח מתחת ל-1MB של מסמך
@@ -53,8 +53,7 @@ function picker() {
 }
 
 function uploadHtml(date, has) {
-  if (!up) return '<label class="btn filebtn"><i class="fa-solid fa-camera"></i> ' + (has ? "החלפת התמונה" : "העלאת מערכת השינויים") + '<input id="dfile" type="file" accept="image/*"></label>' +
-    (has ? '<button type="button" class="btn danger small" id="ddel"><i class="fa-solid fa-trash-can"></i> מחיקת התמונה של היום הזה</button>' : "");
+  if (!up) return '<label class="btn filebtn"><i class="fa-solid fa-camera"></i> ' + (has ? "החלפת התמונה" : "העלאת מערכת השינויים") + '<input id="dfile" type="file" accept="image/*"></label>';   // אין מחיקה: תמונה חדשה נכתבת על הקודמת
   return '<div class="card dform"><h3>' + (has ? "החלפת" : "העלאת") + " מערכת השינויים · " + esc(dateTitle(date)) + "</h3>" +
     '<img class="dprev" src="' + up.data + '" alt="">' +
     field("הערה (לא חובה)", '<input id="dnote" maxlength="80" placeholder="למשל: שינויים בשכבת ז" value="' + esc(up.note || "") + '">') +
@@ -88,7 +87,6 @@ export default {
       catch (e) { alert("לא הצלחנו לעבד את התמונה. לנסות תמונה אחרת או צילום מסך."); return; }
       ui.render();
     };
-    const dd = $("ddel"); if (dd) dd.onclick = async () => { if (confirm("למחוק את מערכת השינויים של היום הזה?") && await tryDo(() => delDaily(date))) ui.render(); };
     if (!up) return;
     const note = $("dnote"); note.oninput = () => { up.note = note.value; };
     for (const r of el.querySelectorAll("[name=dmode]")) r.onchange = () => { up.mode = r.value; ui.render(); };

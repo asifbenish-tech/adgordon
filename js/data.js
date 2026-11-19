@@ -193,7 +193,6 @@ export async function saveDaily(date, doc, notifyTo) {
   await put("daily", date, Object.assign({by: S.user.uid, byName: myFull(), at: Date.now(), to: notifyTo}, doc));
   if (notifyTo.length) notify({kind: "daily", date, to: notifyTo, text: doc.note || ""});
 }
-export const delDaily = date => del("daily", date);
 // ---- השינויים במערכת מניהול גורדון: changes/<תאריך>, נכתב רק ע"י השרת (server/Code.gs, syncChanges_) ----
 // value = JSON: {date, rows: [{h, cls, items: [{tn, u, subj, why, ev, sub: {name, u}}], overrides?, cancel?, note?, teachers?}], absent, note?, mine: {uid: [{h, cls, k: in|out|cancel, who, subj, note}]}}
 const chgW = {};
