@@ -310,6 +310,57 @@ function sgTest_() {
     return r.getResponseCode() === 404 || r.getResponseCode() === 200 ? "עובד ✓" : "נכשל - " + r.getResponseCode() + " (לבדוק שלחשבון השירות יש הרשאת Cloud Datastore Viewer)";
   } catch (err) { return "נכשל - " + err.message; }
 }
+// להרצה ידנית מהעורך: מושך עכשיו את השינויים והתמונה של היום מניהול גורדון (בלי התראות) ומדווח מה עובד ומה לא.
+// הדוח מופיע ביומן הביצוע (למטה בעורך) ונשלח גם במייל. אין בו סודות.
+function checkChanges() {
+  var out = [], p = Utilities.formatDate(new Date(), "Asia/Jerusalem", "u|HH|mm|yyyy-MM-dd").split("|"), date = p[3], sa = null;
+  var ok = function (t) { out.push("✓ " + t); }, bad = function (t) { out.push("✗ " + t); };
+  out.push("בדיקת השינויים מניהול גורדון ל-" + date.split("-").reverse().join("."));
+  try { sa = sgKey_(); if (sa) ok("SG_KEY קיים (" + sa.client_email + ")"); else bad("אין SG_KEY במאפייני הסקריפט"); } catch (err) { bad("SG_KEY: " + err.message); }
+  try { oauth_(); ok("SA_KEY של אפליקציית הצוות עובד"); } catch (err) { bad("SA_KEY: " + err.message); }
+  var trig = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === "tick"; });
+  if (trig) ok("הבדיקה האוטומטית כל 5 דקות פעילה"); else { try { ensureTrigger_(); ok("הבדיקה האוטומטית כל 5 דקות הופעלה עכשיו"); } catch (err) { bad("הבדיקה האוטומטית לא פעילה: " + err.message); } }
+  if (sa) {
+    var hdr = {}, tok;
+    try { tok = saToken_(sa, "sgoauth", "https://www.googleapis.com/auth/datastore"); hdr = {Authorization: "Bearer " + tok}; ok("חשבון השירות של ניהול גורדון מתחבר"); }
+    catch (err) { bad("חשבון השירות של ניהול גורדון לא מתחבר: " + err.message); }
+    if (tok) {
+      var r = UrlFetchApp.fetch(SG_FS + "schools/main/config/staffapp_changes_" + date, {headers: hdr, muteHttpExceptions: true}), code = r.getResponseCode();
+      if (code === 200) {
+        var v = fsObj_(JSON.parse(r.getContentText()).fields || {}), snap = {};
+        try { snap = JSON.parse(v.value || "{}"); } catch (err) {}
+        ok("נמצא בניהול גורדון תקציר להיום: " + (snap.rows || []).length + " שורות שינוי" + (v.at ? ", נשמר ב-" + Utilities.formatDate(new Date(Number(v.at)), "Asia/Jerusalem", "HH:mm") : ""));
+      } else if (code === 404) bad("בניהול גורדון אין עדיין תקציר להיום. צריך לפתוח את ניהול גורדון בדפדפן (כל מסך) ולחכות כמה שניות - הוא נשמר לבד");
+      else if (code === 403) bad("אין הרשאה לקרוא מניהול גורדון (403). לתת לחשבון השירות את התפקיד Cloud Datastore Viewer");
+      else bad("קריאה מניהול גורדון נכשלה: " + code);
+      var ri = UrlFetchApp.fetch(SG_FS + "schools/main/config/staffapp_image_" + date, {headers: hdr, muteHttpExceptions: true});
+      if (ri.getResponseCode() === 200) ok("נמצאה תמונה שנשלחה מניהול גורדון להיום");
+      else if (ri.getResponseCode() === 404) out.push("• לא נשלחה תמונה מניהול גורדון להיום (כפתור \"📲 לאפליקציית הצוות\" בטבלת השינויים להדפסה)");
+      var c = CacheService.getScriptCache(); c.remove("sgv_" + date); c.remove("sgi_" + date); c.remove("tmap");
+      try { syncChanges_(date, sa, false); } catch (err) { bad("העתקת השינויים נכשלה: " + err.message); }
+      try { syncImage_(date, sa, false); } catch (err) { bad("העתקת התמונה נכשלה: " + err.message); }
+    }
+  }
+  try {
+    var ch = fsGet_("changes/" + date);
+    if (ch) {
+      var s2 = JSON.parse(ch.value || "{}"), miss = {};
+      (s2.rows || []).forEach(function (row) {
+        (row.items || []).forEach(function (it) { if (it.tn && !it.u) miss[it.tn] = 1; if (it.sub && it.sub.name && !it.sub.u) miss[it.sub.name] = 1; });
+        (row.teachers || []).forEach(function (t) { if (t.tn && !t.u) miss[t.tn] = 1; });
+      });
+      ok("באפליקציית הצוות יש שינויים להיום: " + (s2.rows || []).length + " שורות, " + Object.keys(s2.mine || {}).length + " אנשי צוות עם שינוי אישי");
+      if (Object.keys(miss).length) bad("שמות שלא זוהו (לא יקבלו את השינוי האישי): " + Object.keys(miss).join(", "));
+    } else bad("באפליקציית הצוות עדיין אין שינויים להיום");
+    var dl = fsGet_("daily/" + date);
+    if (dl) ok("תמונת מערכת השינויים להיום קיימת באפליקציה (הועלתה ע\"י " + (dl.byName || "") + ")"); else out.push("• אין תמונת מערכת שינויים להיום באפליקציה");
+  } catch (err) { bad("קריאה מאפליקציית הצוות נכשלה: " + err.message); }
+  out.push("אם באפליקציה עדיין לא רואים: לוודא שההרשאות (firestore.rules) הודבקו ופורסמו ב-Firebase, ולרענן את האפליקציה.");
+  var txt = out.join("\n");
+  Logger.log(txt);
+  try { MailApp.sendEmail(owner_(), APP_NAME + " - בדיקת השינויים", txt); } catch (err) {}
+  return txt;
+}
 var SG_PROJECT = "school-gordon", CHG_UNTIL = 22 * 60, CHG_PUSH = [6 * 60 + 30, 21 * 60];
 var SG_FS = "https://firestore.googleapis.com/v1/projects/" + SG_PROJECT + "/databases/(default)/documents/";
 var TT_URL = "https://raw.githubusercontent.com/asifbenish-tech/gordon-timetable/master/timetable.json";

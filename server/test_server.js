@@ -374,6 +374,16 @@ assert.strictEqual(pd().tokHasan.title, "מערכת השינויים עלתה");
 W.sgdb["schools/main/config/staffapp_image_2026-11-12"] = img(9500, "none");
 assert.strictEqual(at("2026-11-12T08:40:00+02:00"), 0, "'none': replaced quietly");
 assert.strictEqual(W.fsdb["daily/2026-11-12"].at.integerValue, "9500");
+W.setNow("2026-11-12T23:30:00+02:00"); W.clearCache();
+let rep = W.env.checkChanges();
+assert.match(rep, /✓ SG_KEY קיים/); assert.match(rep, /נמצא בניהול גורדון תקציר להיום: 1 שורות/);
+assert.match(rep, /באפליקציית הצוות יש שינויים להיום: 1 שורות, 2 אנשי צוות/); assert.match(rep, /הבדיקה האוטומטית/);
+assert.doesNotMatch(rep, /private_key|BEGIN/, "the report never contains the key");
+W.sgdb["schools/main/config/staffapp_changes_2026-11-12"] = sgSnap([R3, {h: 6, cls: "ט1", items: [{t: "tZ", tn: "זיוה", subj: "x", why: "absent", sub: null}]}]);
+rep = W.env.checkChanges();
+assert.match(rep, /באפליקציית הצוות יש שינויים להיום: 2 שורות/, "pulled right away, even at night");
+assert.match(rep, /שמות שלא זוהו.*זיוה/);
+delete W.props.SG_KEY; assert.match(W.env.checkChanges(), /✗ אין SG_KEY/);
 W.props.SG_KEY = JSON.stringify(Object.assign({}, SA, {project_id: "other"}));
 assert.strictEqual(at("2026-11-12T08:00:00+02:00"), 0, "a key of another project is refused, without breaking tick");
 
