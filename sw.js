@@ -1,5 +1,5 @@
 // גרסה: להעלות את המספר בכל עדכון, כדי שהטלפונים יקבלו את הגרסה החדשה.
-const CACHE = 'adgordon-v26';
+const CACHE = 'adgordon-v27';
 const CORE = ['./', './index.html', './css/app.css', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './favicon.png', './logo.png', './logo-mark.png',
   './vendor/fa/css/fontawesome.min.css', './vendor/fa/css/solid.min.css', './vendor/fa/webfonts/fa-solid-900.woff2',
   './data/duty.json', './vendor/fonts/rubik-hebrew-wght-normal.woff2', './vendor/fonts/rubik-latin-wght-normal.woff2',
@@ -14,7 +14,9 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   // הקבצים של האפליקציה: קודם מהרשת (כדי לקבל עדכונים), ובלי אינטרנט - מהמטמון
   if (url.origin === location.origin) {
-    e.respondWith(fetch(req).then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req.mode === 'navigate' ? './index.html' : req, copy)); } return r; })
+    // cache: 'no-cache' = לא לקחת עותק ישן מהדפדפן (GitHub Pages שומר עד 10 דקות), כך שעדכון מגיע מיד בפתיחה הבאה
+    const fresh = req.mode === 'navigate' ? fetch(req.url, {cache: 'no-cache', credentials: 'same-origin'}) : fetch(req, {cache: 'no-cache'});
+    e.respondWith(fresh.then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req.mode === 'navigate' ? './index.html' : req, copy)); } return r; })
       .catch(() => caches.match(req.mode === 'navigate' ? './index.html' : req, {ignoreSearch: true})));
     return;
   }
