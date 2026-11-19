@@ -3,12 +3,14 @@
 // בראש: בחירת יום, הערת היום והנעדרים. אחר כך השינויים שלי, ואז כל השינויים לפי שעה. התמונה (אם נשלחה) = כפתור משני.
 import {S} from "../state.js";
 import {BELLS} from "../config.js";
-import {esc, today, parse, iso, hhmm, ls, DAYN} from "../util.js";
+import {esc, today, parse, iso, hhmm, DAYN} from "../util.js";
 import {watchChanges, myChanges, chgText, watchDaily, canPublish} from "../data.js";
 import {loading, empty, secHead, ui} from "../ui.js";
 
 const WHY = {absent: "חסר/ה", event: "מלווה אירוע", borrowed: "בשיעור אחר", vacant: "אין מורה"};
 const DAYS_AHEAD = 14;
+let onlyMine = false;   // לא נשמר במכשיר: כל כניסה למסך מתחילה מכל השינויים בבית החינוך (נשאר רק במעבר בין ימים)
+addEventListener("hashchange", () => { if (!location.hash.startsWith("#/changes")) onlyMine = false; });
 const t0 = s => String(s || "").replace(/^0/, "");
 const count = c => (c && c.rows || []).length;
 
@@ -69,7 +71,7 @@ export default {
   parent: "home", tab: "home",
   title: () => "לוח שינויים",
   html(arg) {
-    const days = chgDays(), date = arg && /^\d{4}-\d{2}-\d{2}$/.test(arg) ? arg : days[0], me = S.user.uid, only = !!ls("adgChgMine");
+    const days = chgDays(), date = arg && /^\d{4}-\d{2}-\d{2}$/.test(arg) ? arg : days[0], me = S.user.uid, only = onlyMine;
     for (const d of days) watchChanges(d);
     watchDaily(date);
     watchChanges(date);   // גם יום שמחוץ לשבועיים (מקישור ישן או מהתראה)
@@ -102,7 +104,7 @@ export default {
     return h;
   },
   bind(el) {
-    const o = el.querySelector("#conly"); if (o) o.onchange = () => { ls("adgChgMine", o.checked ? 1 : 0); ui.render(); };
+    const o = el.querySelector("#conly"); if (o) o.onchange = () => { onlyMine = o.checked; ui.render(); };
     const cur = el.querySelector('.cdays [aria-current="true"]'); if (cur) cur.scrollIntoView({block: "nearest", inline: "center"});
   }
 };
